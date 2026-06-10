@@ -18,6 +18,6 @@ self.addEventListener('fetch', e => {
         caches.open(VERSION).then(c => c.put(e.request, copy));
       }
       return res;
-    }).catch(() => caches.match('index.html')))
+    }).catch(() => e.request.mode === 'navigate' ? caches.match('index.html') : Response.error()))
   );
 });
