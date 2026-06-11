@@ -1,6 +1,6 @@
 // ASCEND service worker — cache-first so the app opens offline once installed.
 // Bump VERSION whenever index.html / data files change to push an update.
-const VERSION = 'ascend-v1';
+const VERSION = 'ascend-v2';
 const CORE = ['./', 'index.html', 'anatomy.js', 'exercise-images.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
