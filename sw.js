@@ -1,8 +1,8 @@
 // ASCEND service worker — the page itself is network-first (so updates show up
 // on a plain reload), everything else cache-first so the app opens offline.
 // Bump VERSION whenever anatomy.js / exercise-images.js / icons change.
-const VERSION = 'ascend-v4';
-const CORE = ['./', 'index.html', 'anatomy.js', 'exercise-images.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
+const VERSION = 'ascend-v5';
+const CORE = ['./', 'index.html', 'anatomy.js', 'exercise-images.js', 'vendor/supabase-js.js', 'config.js', 'sync-core.js', 'backend.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));

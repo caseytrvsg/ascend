@@ -1,0 +1,4 @@
+// Supabase project coordinates. The key is the *publishable* key — safe to ship;
+// row-level security (see supabase/migrations/) is what protects data, not this key.
+window.ASCEND_SUPABASE_URL = "https://powdosapvcvlrhpcggqz.supabase.co";
+window.ASCEND_SUPABASE_KEY = "sb_publishable_4QnCoMp5Q86_hYCCGvGU3w_TwRVmNVF";
