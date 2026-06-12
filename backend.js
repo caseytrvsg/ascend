@@ -96,7 +96,54 @@ window.cloud = (() => {
     if (cx.data) { S.customEx = S.customEx||[]; cx.data.forEach(r => {
       if (!S.customEx.find(c => c.id===r.ex_id)) S.customEx.push({ id:r.ex_id, name:r.name, group:r.grp, equipment:r.equipment });
     }); }
+    startRealtime();
     return S;
+  };
+
+  // ---- social (Phase 3): friends, nudges, leaderboard
+  const me = () => user && user.id;
+  const pair = (a, b) => a < b ? { user_a:a, user_b:b } : { user_a:b, user_b:a };
+  const searchUsers = async q => {
+    const { data } = await sb.from('profiles').select('id,username,sr').ilike('username', '%'+q+'%').neq('id', me()).limit(8);
+    return data || [];
+  };
+  const sendFriendRequest = async otherId => {
+    const { error } = await sb.from('friendships').insert({ ...pair(me(), otherId), requested_by: me() });
+    if (error) throw error;
+  };
+  const respondFriend = async (id, accept) => {
+    const { error } = accept
+      ? (await sb.from('friendships').update({ status:'accepted' }).eq('id', id))
+      : (await sb.from('friendships').delete().eq('id', id));
+    if (error) throw error;
+  };
+  const listFriendships = async () => {
+    const { data } = await sb.from('friendships')
+      .select('*, a:profiles!friendships_user_a_fkey(id,username,sr,streak), b:profiles!friendships_user_b_fkey(id,username,sr,streak)');
+    return (data || []).map(f => ({ ...f, other: f.user_a === me() ? f.b : f.a, mine: f.requested_by === me() }));
+  };
+  const sendNudge = async (toId, msg) => {
+    const { error } = await sb.from('nudges').insert({ from_user: me(), to_user: toId, msg });
+    if (error) throw error;
+  };
+  const listNudges = async () => {
+    const { data } = await sb.from('nudges').select('*, sender:profiles!nudges_from_user_fkey(username,sr)')
+      .eq('to_user', me()).eq('seen', false).order('created_at', { ascending:false });
+    return data || [];
+  };
+  const markNudgeSeen = async id => { await sb.from('nudges').update({ seen:true }).eq('id', id); };
+  const getLeaderboard = async () => {
+    const { data } = await sb.from('profiles').select('id,username,sr').order('sr', { ascending:false }).limit(100);
+    return data || [];
+  };
+  // live nudges / friend requests while the app is open
+  let rtChannel = null, socialCb = () => {};
+  const startRealtime = () => {
+    if (!ready() || rtChannel) return;
+    rtChannel = sb.channel('social')
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'nudges', filter:'to_user=eq.'+me() }, p => socialCb({ type:'nudge', row:p.new }))
+      .on('postgres_changes', { event:'*', schema:'public', table:'friendships' }, p => socialCb({ type:'friend', row:p.new || p.old }))
+      .subscribe();
   };
 
   // first-login from a device that already has local data: queue everything up.
@@ -110,5 +157,7 @@ window.cloud = (() => {
     return (x.profile?1:0)+(x.routines?1:0)+(x.customEx?1:0)+((x.sessions||[]).length)+((x.meals||[]).length); };
 
   return { init, ready, signUp, signIn, signOut, syncNow, pullAll, queueAllLocal, mark, pending,
+    searchUsers, sendFriendRequest, respondFriend, listFriendships, sendNudge, listNudges, markNudgeSeen,
+    getLeaderboard, startRealtime, onSocial: f => { socialCb = f; },
     user: () => user, configured: !!sb, onAuthChange: f => { onChange = f; } };
 })();

@@ -8,6 +8,7 @@ window.SyncCore = (() => {
     calories:S.calories??null, body_fat:S.bodyFat??null, pro:!!S.pro, shards:S.shards||0,
     owned:S.owned||[], inv:S.inv||{}, theme:S.theme||'th_mid', border:S.border||'bd_none',
     banner:S.banner||'bn_none', boost:S.boost||null, streak:S.stk||null, comp:S.comp||null,
+    sr:S.sr||0,
     updated_at: now
   });
   const profileFromRow = r => ({

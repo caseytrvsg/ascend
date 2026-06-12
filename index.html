@@ -364,7 +364,6 @@
       <div class="chiprow" id="boardScope">
         <div class="chip on" onclick="setScope(this,'global')"><span data-icon="globe" data-sz="15"></span> Global</div>
         <div class="chip" onclick="setScope(this,'friends')"><span data-icon="users" data-sz="15"></span> Friends</div>
-        <div class="chip" onclick="setScope(this,'local')"><span data-icon="pin" data-sz="15"></span> Local</div>
       </div>
       <div id="board" style="margin-top:14px;"></div>
     </div>
@@ -829,7 +828,7 @@ function fresh(){ return { name:'Athlete', bw:180, units:'lb', heightCm:null, he
   shards:120, owned:['th_mid','bd_none','bn_none'], inv:{}, boost:null, theme:'th_mid', border:'bd_none', banner:'bn_none', deals:null, onboarded:false }; }
   // NOTE: streak state (S.stk / S.stkLost) is intentionally NOT in fresh() — undefined triggers deriveStreak() migration from session history.
 function save(){
-  if(window.cloud && cloud.ready()) S.profileUpdatedAt=Date.now();
+  if(window.cloud && cloud.ready()){ S.profileUpdatedAt=Date.now(); try{ S.sr=overallSR(); }catch(e){} }
   localStorage.setItem('ascend', JSON.stringify(S));
   if(window.cloud && cloud.ready()) cloud.mark('profile');
 }
@@ -1722,13 +1721,31 @@ function renderBodygraph(){
 }
 function toggleGroup(g){ openGroups[g]=!openGroups[g]; renderBodygraph(); }
 
-// ---------- LEADERBOARD ----------
-// Local-only build: no fake players. The board shows just you until real
-// accounts exist (needs a backend). Rank/SR still progress from your lifts.
-let scope='global';
+// ---------- LEADERBOARD (cloud-backed) ----------
+// Global = every ASCEND account ordered by cached SR; Friends = accepted friends + you.
+let scope='global', lbCache=null, lbAt=0, lbLoading=false;
 function setScope(el,s){ document.querySelectorAll('#boardScope .chip').forEach(c=>c.classList.remove('on')); el.classList.add('on'); scope=s; renderBoard(); }
-function renderBoard(){
-  const mySR=overallSR(); const pool=[{n:S.name||'You',sr:mySR,me:true}];
+async function refreshBoard(){
+  if(!(window.cloud&&cloud.ready())||lbLoading) return;
+  lbLoading=true;
+  try{ lbCache=await cloud.getLeaderboard(); lbAt=Date.now(); renderBoard(true); }catch(e){}
+  lbLoading=false;
+}
+function renderBoard(fromRefresh){
+  const mySR=overallSR(), signedIn=window.cloud&&cloud.ready();
+  let pool;
+  if(signedIn&&lbCache){
+    const uid=cloud.user().id;
+    if(scope==='friends'){
+      pool=FR.friends.map(f=>({n:(f.other&&f.other.username)||'?', sr:(f.other&&f.other.sr)||0, me:false}));
+      pool.push({n:S.name||'You', sr:mySR, me:true});
+    } else {
+      pool=lbCache.map(p=>({n:p.username, sr:p.id===uid?mySR:(p.sr||0), me:p.id===uid}));
+      if(!pool.some(p=>p.me)) pool.push({n:S.name||'You', sr:mySR, me:true});
+    }
+  } else pool=[{n:S.name||'You', sr:mySR, me:true}];
+  pool.sort((a,b)=>b.sr-a.sr);
+  if(!fromRefresh && signedIn && (!lbCache || Date.now()-lbAt>30000)) refreshBoard();
   document.getElementById('board').innerHTML=pool.map((p,i)=>{
     const det=rankDetail(p.sr), r=det.rank, medal=medalSVG(i,26), initials=p.n.slice(0,2).toUpperCase();
     return `<div class="lbrow ${p.me?'me':''}"><div class="lbrank">${medal}</div>
@@ -1737,7 +1754,8 @@ function renderBoard(){
         <div class="tiny" style="color:${r.color};font-weight:600;display:flex;align-items:center;gap:4px;">${rankEmblem(r,14)} ${r.name}${det.division?' '+det.division:''}</div></div>
       <div style="text-align:right;"><div style="font-weight:800;">${det.sr}</div><div class="tiny muted">SR</div></div></div>`;
   }).join('')
-  + (pool.length===1?emptyState('users','Just you out here','Rankings fill in when ASCEND goes online — your SR still climbs with every session.'):'');
+  + (pool.length===1?emptyState('users', scope==='friends'?'No friends on the board yet':'Just you out here',
+      scope==='friends'?'Add friends in the Social tab — accepted friends appear here automatically.':'Get your friends on ASCEND — everyone with an account shows up here, ranked by SR.'):'');
 }
 
 // ---------- PROFILE ----------
@@ -2290,7 +2308,7 @@ function workoutPostBlock(w){
 function renderFeed(){
   const posts=feedPosts(); window._feed=posts;
   const ini0=(S.name||'A').slice(0,1).toUpperCase();
-  const nudgeBadge = incomingNudges.length||challengeCount() ? `<span style="background:var(--bad);color:#fff;border-radius:999px;font-size:11px;font-weight:800;padding:1px 7px;margin-left:6px;">${incomingNudges.length+challengeCount()}</span>` : '';
+  const nudgeBadge = socialCount() ? `<span style="background:var(--bad);color:#fff;border-radius:999px;font-size:11px;font-weight:800;padding:1px 7px;margin-left:6px;">${socialCount()}</span>` : '';
   let html=`<button class="btn ghost" onclick="openFriends()" style="margin-bottom:10px;">${icon('users',17)} Friends · challenge &amp; nudge${nudgeBadge}</button>
     <div class="card" onclick="openCompose()" style="display:flex;align-items:center;gap:12px;cursor:pointer;">
       <div class="avatar" style="background:var(--accent);color:#fff;">${ini0}</div>
@@ -2486,67 +2504,108 @@ function renderCompete(){
   <p class="tiny muted" style="text-align:center;">Competitive rank is separate from your strength rank.</p>`;
 }
 
-// ---------- Friends: challenges + nudges ----------
-// Local-only build: no fake friends. The list fills in when ASCEND has real
-// accounts (needs a backend). Challenge/nudge/chat machinery below stays ready.
-const FRIENDS=[];
-let incomingChallenges=[];
-let sentChallenges=[], nudgedFriends={};
-let incomingNudges=[];
+// ---------- Friends (cloud-backed): search/add, requests, nudges. Duels & chat → Phase 5 ----------
+let incomingChallenges=[];                 // duels arrive with the Compete phase
+let sentChallenges=[], pendingChallengeFriend=null;
+function friendByName(){ return null; }    // chat guard until Phase 5
 const NUDGES=["Time to lift! 💪","The bar misses you 🏋️","Don't break the streak! 🔥","Your muscles won't grow themselves 😤","One session today — let's go ⚡","Get back on the grind 🚀"];
-let pendingChallengeFriend=null;
-function friendByName(n){ return FRIENDS.find(f=>f.n===n); }
-function fSlacking(f){ return f.last>=4; }
-function openFriends(){ renderFriends(); openModal('friendsModal'); }
+let FR={friends:[],reqIn:[],reqOut:[],nudges:[]}, frSearch=[], frSearchQ='', frSent={}, frT=null, nudgeCooldown={};
+function socialCount(){ return FR.nudges.length + FR.reqIn.length; }
 function challengeCount(){ return incomingChallenges.length; }
+function streakDays(stk){ return stk&&stk.last&&stk.start ? Math.round((stk.last-stk.start)/86400000)+1 : 0; }
+async function refreshSocial(){
+  if(!(window.cloud&&cloud.ready())) return;
+  try{
+    const fs=await cloud.listFriendships(), nd=await cloud.listNudges();
+    FR.friends=fs.filter(f=>f.status==='accepted');
+    FR.reqIn=fs.filter(f=>f.status==='pending'&&!f.mine);
+    FR.reqOut=fs.filter(f=>f.status==='pending'&&f.mine);
+    FR.nudges=nd;
+    if(document.getElementById('friendsModal').classList.contains('open')) renderFriends();
+    if(document.getElementById('screen-feed').classList.contains('active')) renderFeed();
+  }catch(e){}
+}
+function openFriends(){ renderFriends(); openModal('friendsModal'); refreshSocial(); }
+function frDoSearch(q){
+  frSearchQ=q; clearTimeout(frT);
+  if(!q||q.trim().length<2){ frSearch=[]; renderFriends(); return; }
+  frT=setTimeout(async()=>{ try{ frSearch=await cloud.searchUsers(q.trim()); }catch(e){ frSearch=[]; } renderFriends(); },250);
+}
+async function frAdd(id,uname){
+  try{ await cloud.sendFriendRequest(id); frSent[id]=true; haptic([0,25]); toast('Request sent to '+uname); renderFriends(); refreshSocial(); }
+  catch(e){ toast(((e&&e.message)||'').includes('duplicate')?'Already requested — or already friends':'Could not send the request'); }
+}
+async function frRespond(id,accept){
+  try{ await cloud.respondFriend(id,accept); haptic(20); toast(accept?'Friend added 💪':'Request removed'); await refreshSocial(); renderFriends(); lbCache=null; }
+  catch(e){ toast('Could not update the request'); }
+}
+async function ackNudge(id){ try{ await cloud.markNudgeSeen(id); }catch(e){} FR.nudges=FR.nudges.filter(n=>n.id!==id); haptic(20); renderFriends(); toast("Let's get after it 💪"); }
+async function nudgeFriend(id,uname){
+  if(nudgeCooldown[id]) return;
+  const msg=NUDGES[Math.floor(Math.random()*NUDGES.length)];
+  try{ await cloud.sendNudge(id,msg); nudgeCooldown[id]=true; haptic([0,20,30,20]); toast('Nudged '+uname+': "'+msg+'"'); renderFriends(); }
+  catch(e){ toast('Could not nudge — check your connection'); }
+}
+function challengeFriend(){ toast('Duels arrive in the next update ⚔️'); }
+function createChallenge(){ toast('Duels arrive in the next update ⚔️'); }
 function renderFriends(){
+  const signedIn=window.cloud&&cloud.ready();
+  const hadFocus=document.activeElement&&document.activeElement.id==='frSearch';
   let h=`<div class="grab"></div>
-    <div class="row sb" style="margin-bottom:8px;"><h2 style="margin:0;">👥 Friends</h2><div class="tiny muted">${FRIENDS.length} friends</div></div>`;
-  incomingNudges.forEach((nd,i)=>{ const f=friendByName(nd.from), r=rankFor(f?f.sr:0);
+    <div class="row sb" style="margin-bottom:8px;"><h2 style="margin:0;">${icon('users',20)} Friends</h2><div class="tiny muted">${FR.friends.length} friend${FR.friends.length===1?'':'s'}</div></div>`;
+  if(!signedIn){
+    h+=emptyState('cloud','Sign in first','Friends live on your account, so they follow you to any device.');
+    h+=`<button class="btn" onclick="closeModal('friendsModal');openAccount('signup')">Create account / Sign in</button>
+      <button class="btn ghost" onclick="closeModal('friendsModal')" style="margin-top:8px;">Close</button>`;
+    document.getElementById('friendsSheet').innerHTML=h; return;
+  }
+  h+=`<input id="frSearch" placeholder="Find friends by lifter name…" value="${escapeAttr(frSearchQ)}" oninput="frDoSearch(this.value)" style="margin-bottom:10px;">`;
+  if(frSearch.length){
+    h+=frSearch.map(u=>{ const r=rankFor(u.sr||0);
+      const isFriend=FR.friends.some(f=>f.other&&f.other.id===u.id), isPend=frSent[u.id]||FR.reqOut.some(f=>f.other&&f.other.id===u.id);
+      return `<div class="card flat" style="padding:10px 12px;"><div class="row" style="gap:10px;">
+        <div class="avatar" style="width:34px;height:34px;font-size:13px;background:${r.color};">${u.username.slice(0,2).toUpperCase()}</div>
+        <div class="grow"><div style="font-weight:700;">${escapeAttr(u.username)}</div><div class="tiny" style="color:${r.color};font-weight:600;">${r.name} · ${u.sr||0} SR</div></div>
+        ${isFriend?'<span class="tiny" style="color:var(--good);font-weight:800;">FRIENDS</span>'
+          :isPend?'<span class="tiny muted" style="font-weight:800;">REQUESTED</span>'
+          :`<button class="btn sm" style="padding:8px 13px;" onclick="frAdd('${u.id}','${escapeAttr(u.username)}')">＋ Add</button>`}
+      </div></div>`; }).join('');
+  } else if(frSearchQ.trim().length>=2){
+    h+=`<div class="tiny muted" style="text-align:center;padding:6px 0 10px;">No lifter named “${escapeAttr(frSearchQ.trim())}” yet — they need an ASCEND account first.</div>`;
+  }
+  FR.nudges.forEach(nd=>{ const un=(nd.sender&&nd.sender.username)||'A friend', r=rankFor((nd.sender&&nd.sender.sr)||0);
     h+=`<div class="card flat" style="border:1px solid var(--accent);padding:12px 14px;"><div class="row" style="gap:10px;">
-      <div class="avatar" style="width:34px;height:34px;font-size:13px;background:${r.color};">${nd.from.slice(0,2).toUpperCase()}</div>
-      <div class="grow"><div style="font-weight:700;">${nd.from} nudged you 👋</div><div class="tiny muted">${nd.msg}</div></div>
-      <button class="btn sm" onclick="ackNudge(${i})">Thanks</button></div></div>`; });
-  if(incomingChallenges.length){
-    h+=`<div class="tiny muted" style="text-transform:uppercase;letter-spacing:.5px;font-weight:800;margin:12px 2px 6px;">Challenge requests</div>`;
-    incomingChallenges.forEach((ch,i)=>{ const f=friendByName(ch.from), r=rankFor(f?f.sr:0), ex=EXMAP[ch.exId];
+      <div class="avatar" style="width:34px;height:34px;font-size:13px;background:${r.color};">${un.slice(0,2).toUpperCase()}</div>
+      <div class="grow"><div style="font-weight:700;">${escapeAttr(un)} nudged you 👋</div><div class="tiny muted">${escapeAttr(nd.msg||'Time to lift!')}</div></div>
+      <button class="btn sm" onclick="ackNudge(${nd.id})">Thanks</button></div></div>`; });
+  if(FR.reqIn.length){
+    h+=`<div class="tiny muted" style="text-transform:uppercase;letter-spacing:.5px;font-weight:800;margin:12px 2px 6px;">Friend requests</div>`;
+    FR.reqIn.forEach(f=>{ const u=f.other||{username:'?'}, r=rankFor(u.sr||0);
       h+=`<div class="card flat" style="padding:12px 14px;"><div class="row" style="gap:10px;">
-        <div class="avatar" style="width:36px;height:36px;font-size:14px;background:${r.color};">${ch.from.slice(0,2).toUpperCase()}</div>
-        <div class="grow"><div style="font-weight:700;">${ch.from} · ${ex.icon} ${ex.name}</div><div class="tiny muted">1v1 duel · heaviest verified lift wins</div></div>
-        <button class="btn good sm" onclick="acceptChallenge(${i})">Accept</button>
-        <button class="btn danger sm" style="padding:8px 9px;" onclick="declineChallenge(${i})">✕</button></div></div>`; }); }
-  if(sentChallenges.length){
+        <div class="avatar" style="width:36px;height:36px;font-size:14px;background:${r.color};">${u.username.slice(0,2).toUpperCase()}</div>
+        <div class="grow"><div style="font-weight:700;">${escapeAttr(u.username)}</div><div class="tiny" style="color:${r.color};font-weight:600;">${r.name} · ${u.sr||0} SR</div></div>
+        <button class="btn good sm" onclick="frRespond(${f.id},true)">Accept</button>
+        <button class="btn danger sm" style="padding:8px 9px;" onclick="frRespond(${f.id},false)">✕</button></div></div>`; });
+  }
+  if(FR.reqOut.length){
     h+=`<div class="tiny muted" style="text-transform:uppercase;letter-spacing:.5px;font-weight:800;margin:12px 2px 6px;">Sent · pending</div>`;
-    sentChallenges.forEach(ch=>{ const ex=EXMAP[ch.exId];
-      h+=`<div class="card flat" style="padding:11px 14px;"><div class="row sb"><div class="tiny"><b>${ch.to}</b> · ${ex.icon} ${ex.name}</div><div class="tiny muted">Waiting…</div></div></div>`; }); }
-  if(!FRIENDS.length) h+=emptyState('users','No friends yet','Adding friends unlocks when ASCEND goes online — challenges, nudges and chat will all live here.');
-  else h+=`<div class="tiny muted" style="text-transform:uppercase;letter-spacing:.5px;font-weight:800;margin:14px 2px 6px;">Your friends</div>`;
-  FRIENDS.forEach(f=>{ const r=rankFor(f.sr), slack=fSlacking(f), nudged=nudgedFriends[f.n];
-    const status=f.last===0?'Trained today':slack?`Slacking · ${f.last} days off`:`Last lift ${f.last}d ago`;
-    h+=`<div class="card flat" style="padding:12px 14px;"><div class="row" style="gap:10px;">
-      <div class="avatar" style="width:40px;height:40px;background:${r.color};">${f.n.slice(0,2).toUpperCase()}</div>
-      <div class="grow"><div style="font-weight:700;">${f.n}</div>
-        <div class="tiny" style="color:${slack?'var(--bad)':'var(--mut)'};">${slack?'😴 ':''}${status}${f.streak>0?` · ${flameSVG(12)}${f.streak}`:''}</div></div>
-      <button class="btn ghost sm" style="padding:8px 11px;" onclick="openChat('${f.n}')">${icon('chat',15)}</button>
-      <button class="btn ghost sm" style="padding:8px 11px;" onclick="challengeFriend('${f.n}')">${icon('swords',15)}</button>
-      <button class="btn ${slack?'':'ghost'} sm" style="padding:8px 11px;${slack?'background:var(--warn);color:#1a1206;':''}${nudged?'opacity:.5;':''}" ${nudged?'disabled':''} onclick="nudgeFriend('${f.n}')">${nudged?'✓ Nudged':'👋'}</button>
-    </div></div>`; });
+    FR.reqOut.forEach(f=>{ h+=`<div class="card flat" style="padding:11px 14px;"><div class="row sb"><div class="tiny"><b>${escapeAttr((f.other&&f.other.username)||'?')}</b></div><div class="tiny muted">Waiting for them to accept…</div></div></div>`; });
+  }
+  if(!FR.friends.length) h+=emptyState('users','No friends yet','Search a lifter name above — once they accept, you appear on each other\'s leaderboards.');
+  else {
+    h+=`<div class="tiny muted" style="text-transform:uppercase;letter-spacing:.5px;font-weight:800;margin:14px 2px 6px;">Your friends</div>`;
+    FR.friends.forEach(f=>{ const u=f.other||{username:'?'}, r=rankFor(u.sr||0), stk=streakDays(u.streak);
+      h+=`<div class="card flat" style="padding:12px 14px;"><div class="row" style="gap:10px;">
+        <div class="avatar" style="width:40px;height:40px;background:${r.color};">${u.username.slice(0,2).toUpperCase()}</div>
+        <div class="grow"><div style="font-weight:700;">${escapeAttr(u.username)}</div>
+          <div class="tiny" style="color:${r.color};font-weight:600;">${r.name} · ${u.sr||0} SR${stk>0?` · ${flameSVG(12)}${stk}`:''}</div></div>
+        <button class="btn ghost sm" style="padding:8px 11px;" onclick="challengeFriend()">${icon('swords',15)}</button>
+        <button class="btn ghost sm" style="padding:8px 11px;${nudgeCooldown[u.id]?'opacity:.5;':''}" ${nudgeCooldown[u.id]?'disabled':''} onclick="nudgeFriend('${u.id}','${escapeAttr(u.username)}')">${nudgeCooldown[u.id]?'✓':'👋'}</button>
+      </div></div>`; });
+  }
   h+=`<button class="btn ghost" onclick="closeModal('friendsModal')" style="margin-top:12px;">Close</button>`;
   document.getElementById('friendsSheet').innerHTML=h;
-}
-function ackNudge(i){ incomingNudges.splice(i,1); haptic(20); renderFriends(); toast("Let's get after it 💪"); }
-function challengeFriend(name){ pendingChallengeFriend=name; closeModal('friendsModal'); openExPicker('challenge'); }
-function createChallenge(exId){
-  if(!pendingChallengeFriend) return;
-  sentChallenges.unshift({to:pendingChallengeFriend, exId});
-  haptic([0,30,40,30]); toast('Challenge sent to '+pendingChallengeFriend+' ⚔️');
-  pendingChallengeFriend=null; closeModal('exModal'); openFriends();
-}
-function nudgeFriend(name){
-  if(nudgedFriends[name]) return;
-  nudgedFriends[name]=true;
-  const msg=NUDGES[Math.floor(Math.random()*NUDGES.length)];
-  haptic([0,20,30,20]); toast('Nudged '+name+': "'+msg+'"'); renderFriends();
+  if(hadFocus){ const s=document.getElementById('frSearch'); if(s){ s.focus(); s.setSelectionRange(s.value.length,s.value.length); } }
 }
 // ---------- Friend chat (texting + routine sharing) ----------
 let chatWith=null, shareOpen=false;
@@ -3084,8 +3143,14 @@ renderTrain();
 window.S = S;
 if(window.cloud && cloud.configured) cloud.init().then(u=>{
   if(!u) return;
+  cloud.onSocial(ev=>{
+    if(ev.type==='nudge'){ haptic([0,20,30,20]); toast('👋 A friend nudged you — check Friends'); }
+    else if(ev.type==='friend' && ev.row && ev.row.status==='pending' && ev.row.requested_by!==cloud.user().id){ haptic([0,20]); toast('New friend request 👥'); }
+    refreshSocial();
+  });
   cloud.pullAll().then(()=>{ localStorage.setItem('ascend', JSON.stringify(S)); applyTheme();
     const cur=document.querySelector('.screen.active'); go(cur?cur.id.replace('screen-',''):'train');
+    refreshSocial();
   }).catch(()=>{});
   cloud.syncNow();
 });
