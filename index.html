@@ -2741,9 +2741,12 @@ function finishOnb(msg){
 }
 // Friendly wording for auth errors a non-technical user will actually hit.
 function authErrMsg(e){ const m=(e&&e.message)||'';
+  if(m.includes('confirm-email-on')) return 'Account needs email confirmation — the app owner must turn off "Confirm email" in Supabase';
+  if(m.includes('Email not confirmed')) return 'This account is waiting on email confirmation — ask the app owner to enable it';
   if(m.includes('already registered')) return 'That email already has an account — tap "Sign in instead"';
   if(m.includes('Database error saving new user')) return 'That lifter name is taken — try another';
   if(m.includes('Invalid login credentials')) return 'Wrong email or password';
+  if(m.includes('rate limit')) return 'Too many attempts right now — wait a few minutes and try again';
   if(m.includes('Failed to fetch')) return 'No connection — check your internet and try again';
   return m||'Something went wrong — try again'; }
 let onbBusy=false;

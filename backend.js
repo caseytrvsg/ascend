@@ -28,7 +28,11 @@ window.cloud = (() => {
   // ---- auth
   const signUp = async (email, password, username) => {
     const { data, error } = await sb.auth.signUp({ email, password, options:{ data:{ username } } });
-    if (error) throw error; user = data.user; return user;
+    if (error) throw error;
+    // No session back = the project still requires email confirmation; without SMTP
+    // configured that mail never arrives, so surface it loudly instead of half-working.
+    if (!data.session) throw new Error('confirm-email-on');
+    user = data.user; return user;
   };
   const signIn = async (email, password) => {
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
