@@ -2043,7 +2043,21 @@ function renderAnalysis(){
 }
 
 // ---------- Settings (cog) ----------
-function openSettings(){ document.getElementById('settingsScreen').classList.add('show'); renderSettings(); }
+let pushOn=false;
+function openSettings(){ document.getElementById('settingsScreen').classList.add('show'); renderSettings();
+  if(window.cloud&&cloud.ready()) cloud.pushEnabled().then(v=>{ if(v!==pushOn){ pushOn=v; if(document.getElementById('settingsScreen').classList.contains('show')) renderSettings(); } }); }
+async function togglePush(){
+  try{
+    if(pushOn){ await cloud.disablePush(); pushOn=false; toast('Nudge notifications off'); }
+    else { await cloud.enablePush(); pushOn=true; haptic([0,25,30,25]); toast('Nudge notifications on 🔔'); }
+  }catch(e){
+    const m=(e&&e.message)||'';
+    toast(m==='push-denied'?'Notifications blocked — allow them for ASCEND in your phone settings'
+      :m==='push-unsupported'?'Install ASCEND to your home screen first, then turn this on'
+      :'Could not switch notifications — try again');
+  }
+  renderSettings();
+}
 function closeSettings(){ document.getElementById('settingsScreen').classList.remove('show'); renderProfile(); }
 function comingSoon(){ toast('Coming soon'); }
 function setRow(icon,label,opts){ opts=opts||{};
@@ -2068,7 +2082,9 @@ function renderSettings(){
       ${setRow(icon('user',18),'Edit profile',{onclick:'openEdit()'})}
       ${setRow(icon('barbell',19),'Units',{right:unitSeg})}
       <div class="setsec">Preferences</div>
-      ${setRow(icon('bell',18),'Notifications',{onclick:'comingSoon()'})}
+      ${window.cloud&&cloud.ready()
+        ? setRow(icon('bell',18),'Nudge notifications',{right:`<button class="chip ${pushOn?'on':''}" onclick="event.stopPropagation();togglePush()">${pushOn?'On 🔔':'Off'}</button>`})
+        : setRow(icon('bell',18),'Notifications',{onclick:"toast('Sign in first — notifications are per account')"})}
       ${setRow('<span style="color:#ff5a6e;">'+icon('heart',18)+'</span>','Apple Health',{onclick:'comingSoon()'})}
       ${setRow('<span style="color:#fc4c02;">'+icon('bolt',18)+'</span>','Connect Strava',{onclick:'comingSoon()'})}
       ${setRow(icon('palette',18),'Theme',{onclick:'comingSoon()'})}

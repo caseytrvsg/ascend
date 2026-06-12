@@ -123,8 +123,43 @@ window.cloud = (() => {
     return (data || []).map(f => ({ ...f, other: f.user_a === me() ? f.b : f.a, mine: f.requested_by === me() }));
   };
   const sendNudge = async (toId, msg) => {
-    const { error } = await sb.from('nudges').insert({ from_user: me(), to_user: toId, msg });
+    const { data, error } = await sb.from('nudges').insert({ from_user: me(), to_user: toId, msg }).select('id').single();
     if (error) throw error;
+    // fire-and-forget: ask the edge function to push an OS notification to their devices
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) fetch(window.ASCEND_SUPABASE_URL + '/functions/v1/push-nudge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': window.ASCEND_SUPABASE_KEY },
+        body: JSON.stringify({ nudge_id: data.id }),
+      }).catch(() => {});
+    } catch (e) {}
+  };
+
+  // ---- Web Push opt-in (per device)
+  const b64ToU8 = s => { const p = '='.repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from([...b].map(c => c.charCodeAt(0))); };
+  const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const pushEnabled = async () => {
+    if (!pushSupported()) return false;
+    try { const reg = await navigator.serviceWorker.ready; return !!(await reg.pushManager.getSubscription()); } catch (e) { return false; }
+  };
+  const enablePush = async () => {
+    if (!pushSupported()) throw new Error('push-unsupported');
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') throw new Error('push-denied');
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(window.ASCEND_VAPID_PUBLIC_KEY) });
+    const j = sub.toJSON();
+    const { error } = await sb.from('push_subscriptions').upsert(
+      { user_id: me(), endpoint: sub.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth }, { onConflict: 'endpoint' });
+    if (error) throw error;
+    return true;
+  };
+  const disablePush = async () => {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) { try { await sb.from('push_subscriptions').delete().eq('endpoint', sub.endpoint); } catch (e) {} await sub.unsubscribe(); }
   };
   const listNudges = async () => {
     const { data } = await sb.from('nudges').select('*, sender:profiles!nudges_from_user_fkey(username,sr)')
@@ -159,5 +194,6 @@ window.cloud = (() => {
   return { init, ready, signUp, signIn, signOut, syncNow, pullAll, queueAllLocal, mark, pending,
     searchUsers, sendFriendRequest, respondFriend, listFriendships, sendNudge, listNudges, markNudgeSeen,
     getLeaderboard, startRealtime, onSocial: f => { socialCb = f; },
+    pushSupported, pushEnabled, enablePush, disablePush,
     user: () => user, configured: !!sb, onAuthChange: f => { onChange = f; } };
 })();

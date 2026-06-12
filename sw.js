@@ -2,7 +2,7 @@
 // so edits show up on a plain reload; big static bundles are cache-first for
 // speed. Everything is cached either way, so the app still opens fully offline.
 // Bump VERSION whenever anatomy.js / exercise-images.js / vendor files / icons change.
-const VERSION = 'ascend-v7';
+const VERSION = 'ascend-v8';
 const CORE = ['./', 'index.html', 'anatomy.js', 'exercise-images.js', 'vendor/supabase-js.js', 'vendor/zxing.js', 'config.js', 'sync-core.js', 'scanner.js', 'backend.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 const FRESH = ['config.js', 'sync-core.js', 'scanner.js', 'backend.js'];   // network-first app code
 
@@ -12,6 +12,21 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
+// Web Push: show nudges in the OS notification centre; tapping opens the app.
+self.addEventListener('push', e => {
+  let d = {}; try { d = e.data.json(); } catch (err) {}
+  e.waitUntil(self.registration.showNotification(d.title || 'ASCEND', {
+    body: d.body || '', icon: 'icon-192.png', badge: 'icon-192.png', tag: d.tag || 'ascend', data: d,
+  }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(ws => {
+    for (const w of ws) { if ('focus' in w) return w.focus(); }
+    return clients.openWindow('./');
+  }));
+});
+
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;                          // let POSTs (exercise requests) pass through
   const path = new URL(e.request.url).pathname.split('/').pop();
