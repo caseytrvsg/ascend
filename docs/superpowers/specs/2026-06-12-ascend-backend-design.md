@@ -98,6 +98,19 @@ system + photo proof — no anti-cheat referee in scope.
 **Chat.** `messages` table + realtime subscription for live delivery. Routine-share cards
 (already built in the UI) send the routine JSON in the message row.
 
+**Real scanning (replaces today's simulated scans).** Both scanners open a live camera
+viewfinder (`getUserMedia`, rear camera; requires HTTPS — works on localhost dev and the
+GitHub Pages deploy, NOT over LAN HTTP).
+- *Barcode:* decoded on-device in real time — native `BarcodeDetector` where available,
+  bundled JS fallback library elsewhere (vendored into the repo so it works offline) —
+  then looked up in the free Open Food Facts database for label-exact macros. Unknown
+  barcodes fall back to manual food search. Lookup needs internet; scans queue nothing.
+- *Meal photo:* live viewfinder → snap frame → sent to a Supabase Edge Function
+  (`scan-meal`) that calls an AI vision model with a server-held key and returns detected
+  foods + estimated portions into the existing editable results sheet. Costs ~1–2¢ per
+  scan; requires an AI provider account (Casey's call on when to enable — barcode scanner
+  ships first and does not depend on this).
+
 **Security.** Row-level security on every table: only you write your rows; reads limited
 to what the feature needs (e.g., messages visible only to the two participants; profiles
 readable by all signed-in users for leaderboards). The publishable API key in the app is
@@ -107,9 +120,15 @@ safe to expose by design — RLS is the lock, not the key.
 
 1. **Phase 1 — Live app + accounts + cloud save:** GitHub Pages deploy, sign-up/sign-in,
    profile + training data sync, multi-device. Friends can install and train.
-2. **Phase 2 — Friends + leaderboard:** friend requests, real rankings.
-3. **Phase 3 — Feed:** posts, likes, rank-up/PR auto-posts.
-4. **Phase 4 — Compete + chat:** challenges, duels with proof photos, SR exchange, DMs.
+2. **Phase 2 — Real scanners:** live-camera barcode scanner + Open Food Facts lookup;
+   AI meal scan via `scan-meal` Edge Function (enabled when Casey OKs the AI account).
+3. **Phase 3 — Friends + leaderboard:** friend requests, real rankings.
+4. **Phase 4 — Feed:** posts, likes, rank-up/PR auto-posts.
+5. **Phase 5 — Compete + chat:** challenges, duels with proof photos, SR exchange, DMs.
+
+Runs alongside (independent of backend): the visual/UI quality pass — custom SVG
+iconography replacing emoji, rank-screen drama (emblem art, glow, animation), spacing/
+typography polish, illustrated empty states.
 
 ## Out of scope (deliberate)
 
@@ -118,10 +137,7 @@ leaderboards, native app-store builds, anti-cheat verification of lifts.
 
 ## Prerequisites
 
-- Casey creates a free Supabase account (sign in with GitHub at supabase.com) — only
-  manual step; everything else is automated from this machine.
-
-## Possible follow-on project (not in this spec)
-
-Visual/UI quality pass (typography, iconography, empty-state art, rank-screen drama).
-Tracked separately so it can run alongside or after Phase 1 without blocking backend work.
+- Casey creates a free Supabase account (sign in with GitHub at supabase.com) — needed at
+  Phase 1; everything else is automated from this machine.
+- An AI provider account for the meal scanner (~1–2¢/scan) — needed only to switch on the
+  AI half of Phase 2; barcode scanning works without it.
