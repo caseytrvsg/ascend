@@ -1,6 +1,7 @@
-// ASCEND service worker — cache-first so the app opens offline once installed.
-// Bump VERSION whenever index.html / data files change to push an update.
-const VERSION = 'ascend-v3';
+// ASCEND service worker — the page itself is network-first (so updates show up
+// on a plain reload), everything else cache-first so the app opens offline.
+// Bump VERSION whenever anatomy.js / exercise-images.js / icons change.
+const VERSION = 'ascend-v4';
 const CORE = ['./', 'index.html', 'anatomy.js', 'exercise-images.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -11,6 +12,15 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;                          // let POSTs (exercise requests) pass through
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res.ok) { const copy = res.clone(); caches.open(VERSION).then(c => c.put(e.request, copy)); }
+        return res;
+      }).catch(() => caches.match(e.request).then(hit => hit || caches.match('index.html')))
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
       if (res.ok && new URL(e.request.url).origin === location.origin) {
@@ -18,6 +28,6 @@ self.addEventListener('fetch', e => {
         caches.open(VERSION).then(c => c.put(e.request, copy));
       }
       return res;
-    }).catch(() => e.request.mode === 'navigate' ? caches.match('index.html') : Response.error()))
+    }).catch(() => Response.error()))
   );
 });

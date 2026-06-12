@@ -1442,9 +1442,6 @@ function renderOverview(){
   document.getElementById('rankGlow').style.background=r.color;
   const pct = nx ? (sr-r.min)/(nx.min-r.min) : 1;
   const C=2*Math.PI*88;
-  // standings (mock but plausible)
-  const topPct=Math.max(0.05, Math.round((1 - sr/(ASC*100))*60*10)/10);
-  const base=482157, globalRank=Math.max(1,Math.round(base*topPct/100)), regional=Math.max(1,Math.round(globalRank/14));
   // total volume & PRs
   const totalVol=S.sessions.reduce((a,s)=>a+sessionVolume(s),0), best=bestLifts();
   const ratios=Object.entries(best).map(([id,b])=>b.w/S.bw), bestRatio=ratios.length?Math.max(...ratios):0;
@@ -1466,13 +1463,7 @@ function renderOverview(){
       <div style="margin-top:12px;" class="tiny muted">${nx?`<b style="color:${nx.color}">${det.toNext} SR</b> to <b>${nx.name}</b>`:`Peak rank — <b style="color:${r.color}">Ascended</b> ☀️`}</div>
     </div>
 
-    <h2 style="margin-top:6px;">Standings</h2>
-    <div class="statgrid">
-      <div class="stat"><div class="v">#${fmt(globalRank)}</div><div class="l">Global · Top ${topPct}%</div></div>
-      <div class="stat"><div class="v">#${fmt(regional)}</div><div class="l">Regional</div></div>
-    </div>
-
-    <h2>Rank over time</h2>
+    <h2 style="margin-top:6px;">Rank over time</h2>
     <div class="card">${rankChart()}</div>
 
     <div class="statgrid">
@@ -1616,15 +1607,12 @@ function renderBodygraph(){
 function toggleGroup(g){ openGroups[g]=!openGroups[g]; renderBodygraph(); }
 
 // ---------- LEADERBOARD ----------
-const BOTS=[{n:'IronMike',sr:585},{n:'SquatQueen',sr:540},{n:'DeadliftDan',sr:470},{n:'PlateGod',sr:735},{n:'reps4days',sr:320},
-  {n:'BenchBeast',sr:415},{n:'TinyTank',sr:505},{n:'GymRat99',sr:250},{n:'MaxEffort',sr:560},{n:'CleanJerk',sr:360},
-  {n:'PRorDie',sr:690},{n:'NoSkipLegs',sr:290},{n:'Hypertrophy',sr:230},{n:'ApexLifter',sr:812},{n:'SteadyGains',sr:175}];
+// Local-only build: no fake players. The board shows just you until real
+// accounts exist (needs a backend). Rank/SR still progress from your lifts.
 let scope='global';
 function setScope(el,s){ document.querySelectorAll('#boardScope .chip').forEach(c=>c.classList.remove('on')); el.classList.add('on'); scope=s; renderBoard(); }
 function renderBoard(){
-  const mySR=overallSR(); let pool=BOTS.map(b=>({...b,me:false}));
-  if(scope==='friends') pool=pool.slice(0,7); if(scope==='local') pool=pool.slice(3,12);
-  pool.push({n:S.name||'You',sr:mySR,me:true}); pool.sort((a,b)=>b.sr-a.sr);
+  const mySR=overallSR(); const pool=[{n:S.name||'You',sr:mySR,me:true}];
   document.getElementById('board').innerHTML=pool.map((p,i)=>{
     const det=rankDetail(p.sr), r=det.rank, medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1), initials=p.n.slice(0,2).toUpperCase();
     return `<div class="lbrow ${p.me?'me':''}"><div class="lbrank">${medal}</div>
@@ -1632,7 +1620,8 @@ function renderBoard(){
       <div class="grow"><div style="font-weight:700;">${p.n} ${p.me?'<span class="tiny" style="color:var(--accent2)">· you</span>':''}</div>
         <div class="tiny" style="color:${r.color};font-weight:600;display:flex;align-items:center;gap:4px;">${rankEmblem(r,14)} ${r.name}${det.division?' '+det.division:''}</div></div>
       <div style="text-align:right;"><div style="font-weight:800;">${det.sr}</div><div class="tiny muted">SR</div></div></div>`;
-  }).join('');
+  }).join('')
+  + (pool.length===1?`<div class="tiny muted" style="text-align:center;padding:18px 14px;">No other lifters on the board yet — rankings fill in when ASCEND goes online. Your SR still climbs with every session.</div>`:'');
 }
 
 // ---------- PROFILE ----------
@@ -1945,7 +1934,6 @@ function renderSettings(){
       ${setRow('🟧','Connect Strava',{onclick:'comingSoon()'})}
       ${setRow('🎨','Theme',{onclick:'comingSoon()'})}
       <div class="setsec">Data & testing</div>
-      ${setRow('🧪','Load demo athlete',{onclick:'loadDemo();closeSettings()'})}
       ${setRow('✨','Preview ascension',{onclick:'closeSettings();previewAscension()'})}
       ${setRow('⭐','Pro mode (preview)',{right:proSeg})}
       ${setRow('🗑️','Reset all data',{onclick:"if(confirm('Erase all data?')){resetAll();closeSettings();}",color:'var(--bad)'})}
@@ -2048,42 +2036,6 @@ function setUnits(u){
   renderProfile(); renderTrain();
   toast('Switched to '+u+(f!==1?' · weights converted':''));
 }
-function loadDemo(){
-  S.name='Casey'; S.bw=185; S.units='lb'; S.sex='m';
-  S.heightCm=180; S.heightUnit='ft'; S.age=27; S.activity='active'; S.bodyFat=14; S.goal='Build muscle'; S.calories=null; S.onboarded=true; S.shards=4241; S.owned=['th_mid','bd_none','bn_none','th_jade','bd_water']; S.inv={freeze:1,xp2:1}; S.boost=null; S.stk=undefined; S.stkLost=null;
-  S.chats={ SquatQueen:[
-    {me:false,text:"yo how was leg day 👀",ts:Date.now()-7200000},
-    {me:true,text:"brutal. squats moved well tho",ts:Date.now()-7100000},
-    {me:false,routine:{name:'Glute Builder',items:[{id:'hip',sets:4},{id:'squat',sets:3},{id:'legcurl',sets:3},{id:'calf',sets:3}]},ts:Date.now()-7000000},
-    {me:false,text:"try this thursday, it's a killer",ts:Date.now()-6990000},
-  ]};
-  const today=new Date(); const mk=(daysAgo,exs)=>{ const t=today.getTime()-daysAgo*86400000; return {start:t,end:t+3600000,exercises:exs.map(e=>({id:e.id,sets:e.sets.map(s=>({...s,done:true}))}))}; };
-  S.sessions=[
-    mk(12,[{id:'bench',sets:[{weight:175,reps:5},{weight:195,reps:3}]},{id:'inclineBb',sets:[{weight:125,reps:8}]},{id:'pushdown',sets:[{weight:60,reps:12}]}]),
-    mk(9,[{id:'squat',sets:[{weight:255,reps:5},{weight:295,reps:2}]},{id:'rdl',sets:[{weight:225,reps:6}]},{id:'legext',sets:[{weight:130,reps:12}]}]),
-    mk(7,[{id:'dead',sets:[{weight:315,reps:5},{weight:365,reps:2}]},{id:'rowBb',sets:[{weight:175,reps:6}]},{id:'pullup',sets:[{weight:25,reps:6}]}]),
-    mk(4,[{id:'bench',sets:[{weight:185,reps:5},{weight:205,reps:3},{weight:225,reps:1}]},{id:'ohp',sets:[{weight:115,reps:5}]},{id:'curlBb',sets:[{weight:85,reps:10}]}]),
-    mk(2,[{id:'squat',sets:[{weight:275,reps:5},{weight:315,reps:2}]},{id:'legpress',sets:[{weight:450,reps:10}]},{id:'calf',sets:[{weight:200,reps:15}]}]),
-    mk(1,[{id:'dead',sets:[{weight:335,reps:4},{weight:405,reps:1}]},{id:'latpull',sets:[{weight:160,reps:10}]},{id:'facepull',sets:[{weight:50,reps:15}]}]),
-  ];
-  S.routines=[
-    {name:'Push Day', items:[{id:'bench',sets:4},{id:'ohp',sets:3},{id:'inclineDb',sets:3},{id:'pushdown',sets:3}]},
-    {name:'Pull Day', items:[{id:'dead',sets:3},{id:'rowBb',sets:4},{id:'latpull',sets:3},{id:'curlBb',sets:3}]},
-  ];
-  S.comp={tier:3, div:1, sr:43, wins:14, losses:6, streak:3};
-  const ps=S.sessions[3];
-  S.posts=[{type:'post', caption:"Chest + arms today. Bench finally moving 📈", media:null,
-    workout:{title:guessSplit(ps), sets:ps.exercises.reduce((a,e)=>a+e.sets.length,0), vol:sessionVolume(ps), act:activationForSession(ps)},
-    when:'3h', likes:24, comments:5, ts:Date.now()-10800000}];
-  const td=new Date().toDateString();
-  S.meals=[
-    {day:td, ts:Date.now()-7200000, name:'Greek Yogurt', emoji:'🥛', serving:'170g', mult:1, kcal:100,p:17,c:6,f:0},
-    {day:td, ts:Date.now()-7100000, name:'Banana', emoji:'🍌', serving:'1 medium', mult:1, kcal:105,p:1,c:27,f:0},
-    {day:td, ts:Date.now()-3600000, name:'Grilled Chicken Breast', emoji:'🍗', serving:'120g', mult:1.5, kcal:297,p:56,c:0,f:6},
-    {day:td, ts:Date.now()-3500000, name:'White Rice', emoji:'🍚', serving:'150g', mult:1, kcal:205,p:4,c:45,f:0},
-  ];
-  S.active=null; rest=0; save(); toast('Demo athlete loaded'); go('rank');
-}
 function resetAll(){ if(confirm('Erase all data?')){ S=fresh(); save(); go('train'); toast('Reset complete'); } }
 
 // ---------- helpers ----------
@@ -2146,19 +2098,9 @@ let feedScope='foryou', likeState={};
 function setFeedScope(el,s){ document.querySelectorAll('#feedScope .chip').forEach(c=>c.classList.remove('on')); el.classList.add('on'); feedScope=s; renderFeed(); }
 function guessSplit(ses){ const cnt={}; ses.exercises.forEach(e=>{const g=EXMAP[e.id].group; cnt[g]=(cnt[g]||0)+1;}); let best='Full Body',m=0; for(const g in cnt) if(cnt[g]>m){m=cnt[g];best=g;} return best+' Day'; }
 function feedPosts(){
-  const base=[
-    {user:'PlateGod',   sr:735, type:'rankup',  rank:'Grandchampion',  cap:'Two years for this. Worth every rep.', when:'12m', likes:212, comments:34, friend:false},
-    {user:'SquatQueen', sr:540, type:'pr',      lift:'Back Squat', wt:315, reps:3,  when:'34m', likes:88,  comments:12, friend:true},
-    {user:'IronMike',   sr:585, type:'workout', title:'Push Day', sets:22, vol:18400, when:'1h',  likes:41,  comments:5,  friend:true},
-    {user:'PRorDie',    sr:690, type:'rankup',  rank:'Champion',       cap:'', when:'2h',  likes:130, comments:21, friend:false},
-    {user:'reps4days',  sr:320, type:'pr',      lift:'Deadlift', wt:405, reps:1,   when:'3h',  likes:67,  comments:9,  friend:true},
-    {user:'TinyTank',   sr:505, type:'workout', title:'Leg Day', sets:18, vol:24200, when:'5h',  likes:52,  comments:7,  friend:false},
-    {user:'CleanJerk',  sr:360, type:'pr',      lift:'Overhead Press', wt:155, reps:5, when:'7h', likes:29, comments:3, friend:false},
-  ];
-  base.forEach(p=>{ if(!p.id) p.id=p.user+'|'+p.when; });
-  const mine=(S.posts||[]).map(p=>({...p, me:true, friend:true, user:S.name||'You', sr:overallSR(), id:'u'+p.ts}));
-  const all=[...mine, ...base];
-  return feedScope==='friends' ? all.filter(p=>p.me||p.friend) : all;
+  // Local-only build: the feed holds your own posts only. Other people's posts
+  // arrive when ASCEND has real accounts (needs a backend).
+  return (S.posts||[]).map(p=>({...p, me:true, friend:true, user:S.name||'You', sr:overallSR(), id:'u'+p.ts}));
 }
 function workoutPostBlock(w){
   const cf=actColorFn(w.act);
@@ -2202,6 +2144,7 @@ function renderFeed(){
         <button style="margin-left:auto;">↗︎ Share</button>
       </div></div>`;
   }).join('');
+  if(!posts.length) html+=`<div class="tiny muted" style="text-align:center;padding:26px 14px;">Your feed is empty — finish a workout and share it, and it'll show up here.</div>`;
   document.getElementById('feedBody').innerHTML=html;
 }
 function toggleLike(i){ const p=window._feed[i]; likeState[p.id]=!likeState[p.id]; haptic(likeState[p.id]?[0,15,30,15]:10); renderFeed(); }
@@ -2247,21 +2190,16 @@ function submitPost(){
 let compView='home', compSplit=null, compMatch=null, compResult=null, compTimer=null;
 const SPLITS=['Chest','Back','Legs','Shoulders','Arms','Push','Pull','Full Body'];
 const CHALLENGE_EX={Chest:'bench',Back:'dead',Legs:'squat',Shoulders:'ohp',Arms:'curlBb',Push:'bench',Pull:'rowBb','Full Body':'dead'};
-const OPP_NAMES=['IronMike','PlateGod','MaxEffort','BenchBeast','ApexLifter','CleanJerk','PRorDie','reps4days','NoSkipLegs','SteadyGains'];
 const SOON={'2v2 Squads':'Team up · 2-on-2 ranked battles','Free-for-All':'8 lifters · last one standing','Ranked Tournaments':'Bracketed seasonal events'};
 function compDetail(){ const asc=S.comp.tier===ASC; return {rank:RANKS[S.comp.tier], division:asc?null:DIV_LABELS[S.comp.div], sr:S.comp.sr, ascended:asc}; }
 function compOrdinal(){ return S.comp.tier*3+S.comp.div; }
 function selectSplit(s){ compSplit=s; renderCompete(); }
-function findMatch(){ if(!compSplit){ toast('Pick your split day'); return; } compView='queue'; renderCompete(); compTimer=setTimeout(()=>{ buildMatch(); compView='match'; haptic([0,40,40,90]); renderCompete(); }, 2000); }
+// Local-only build: matchmaking no longer invents an opponent. The queue
+// searches, finds nobody (honestly — there's no server yet), and says so.
+// Real matchmaking slots back in here when ASCEND goes online.
+function findMatch(){ if(!compSplit){ toast('Pick your split day'); return; } compView='queue'; renderCompete(); compTimer=setTimeout(()=>{ compView='nomatch'; haptic(30); renderCompete(); }, 2000); }
 function cancelQueue(){ clearTimeout(compTimer); compView='home'; renderCompete(); }
 let duelPhoto=null;
-function buildMatch(){
-  const exId=CHALLENGE_EX[compSplit]; let ref=(bestLifts()[exId]||{}).w||0;
-  if(!ref) ref=EXMAP[exId].std*S.bw*0.62;
-  const oppW=Math.round(ref*(0.9+Math.random()*0.2)/5)*5;   // opponent's lifted weight, to nearest 5
-  let ti=S.comp.tier+(Math.random()<.34?-1:Math.random()<.5?1:0); ti=Math.max(0,Math.min(RANKS.length-1,ti));
-  compMatch={ name:OPP_NAMES[Math.floor(Math.random()*OPP_NAMES.length)], tier:ti, div:Math.floor(Math.random()*3), exId, oppW, ref };
-}
 function startDuel(){ duelPhoto=null; compView='duel'; renderCompete(); }
 function pickDuelPhoto(input){ readImage(input,u=>{ duelPhoto=u; renderCompete(); }); }
 function submitDuel(){
@@ -2294,6 +2232,14 @@ function renderCompete(){
       <div style="font-weight:800;font-size:17px;margin-top:24px;">Searching for an opponent</div>
       <div class="tiny muted" style="margin-top:4px;">${compSplit} day · matching your rank</div>
       <button class="btn ghost" style="margin-top:24px;width:auto;padding:12px 28px;" onclick="cancelQueue()">Cancel</button>
+    </div>`; return; }
+  if(compView==='nomatch'){
+    el.innerHTML=`<div class="head"><h1>Compete</h1></div>
+    <div class="card" style="text-align:center;padding:36px 16px;">
+      <div style="font-size:42px;">🛰️</div>
+      <div style="font-weight:800;font-size:17px;margin-top:12px;">No opponents online</div>
+      <div class="tiny muted" style="margin-top:6px;line-height:1.5;">Duels match you against real lifters — matchmaking opens up when ASCEND goes online.<br>Your ${compSplit} day will be ready.</div>
+      <button class="btn ghost" style="margin-top:22px;width:auto;padding:12px 28px;" onclick="compView='home';renderCompete()">Back</button>
     </div>`; return; }
   if(compView==='match'){ const m=compMatch, ex=EXMAP[m.exId], you=compDetail(), oc=RANKS[m.tier].color, yc=you.rank.color;
     el.innerHTML=`<div class="head"><h1>Match found</h1></div>
@@ -2366,17 +2312,12 @@ function renderCompete(){
 }
 
 // ---------- Friends: challenges + nudges ----------
-const FRIENDS=[
-  {n:'SquatQueen', sr:540, ct:4,cd:2, last:0, streak:9},
-  {n:'IronMike',   sr:585, ct:5,cd:1, last:1, streak:6},
-  {n:'PRorDie',    sr:690, ct:6,cd:1, last:2, streak:4},
-  {n:'CleanJerk',  sr:360, ct:2,cd:2, last:3, streak:2},
-  {n:'reps4days',  sr:320, ct:2,cd:0, last:6, streak:0},
-  {n:'TinyTank',   sr:505, ct:4,cd:0, last:9, streak:0},
-];
-let incomingChallenges=[{from:'IronMike',exId:'bench'},{from:'SquatQueen',exId:'squat'}];
+// Local-only build: no fake friends. The list fills in when ASCEND has real
+// accounts (needs a backend). Challenge/nudge/chat machinery below stays ready.
+const FRIENDS=[];
+let incomingChallenges=[];
 let sentChallenges=[], nudgedFriends={};
-let incomingNudges=[{from:'PRorDie',msg:'Leg day is calling — get back in there! 🔥'}];
+let incomingNudges=[];
 const NUDGES=["Time to lift! 💪","The bar misses you 🏋️","Don't break the streak! 🔥","Your muscles won't grow themselves 😤","One session today — let's go ⚡","Get back on the grind 🚀"];
 let pendingChallengeFriend=null;
 function friendByName(n){ return FRIENDS.find(f=>f.n===n); }
@@ -2403,7 +2344,8 @@ function renderFriends(){
     h+=`<div class="tiny muted" style="text-transform:uppercase;letter-spacing:.5px;font-weight:800;margin:12px 2px 6px;">Sent · pending</div>`;
     sentChallenges.forEach(ch=>{ const ex=EXMAP[ch.exId];
       h+=`<div class="card flat" style="padding:11px 14px;"><div class="row sb"><div class="tiny"><b>${ch.to}</b> · ${ex.icon} ${ex.name}</div><div class="tiny muted">Waiting…</div></div></div>`; }); }
-  h+=`<div class="tiny muted" style="text-transform:uppercase;letter-spacing:.5px;font-weight:800;margin:14px 2px 6px;">Your friends</div>`;
+  if(!FRIENDS.length) h+=`<div class="tiny muted" style="text-align:center;padding:26px 14px;">No friends yet — adding friends unlocks when ASCEND goes online. Challenges, nudges and chat will all live here.</div>`;
+  else h+=`<div class="tiny muted" style="text-transform:uppercase;letter-spacing:.5px;font-weight:800;margin:14px 2px 6px;">Your friends</div>`;
   FRIENDS.forEach(f=>{ const r=rankFor(f.sr), slack=fSlacking(f), nudged=nudgedFriends[f.n];
     const status=f.last===0?'Trained today':slack?`Slacking · ${f.last} days off`:`Last lift ${f.last}d ago`;
     h+=`<div class="card flat" style="padding:12px 14px;"><div class="row" style="gap:10px;">
@@ -2432,9 +2374,7 @@ function nudgeFriend(name){
   haptic([0,20,30,20]); toast('Nudged '+name+': "'+msg+'"'); renderFriends();
 }
 // ---------- Friend chat (texting + routine sharing) ----------
-let chatWith=null, chatTimer=null, shareOpen=false;
-const CHAT_REPLIES=["Let's gooo 💪","I'm at the gym rn actually 😤","Bet. Tomorrow 7am?","Haha facts","New PR loading… 📈","Rest day today, back at it tomorrow","Send me your split","That's insane 🔥","Respect the grind 🤝"];
-const CHAT_ROUTINE_REPLIES=["Yo this looks solid — adding it to my split 🔥","Saving this for pull day 🙏","Ok this is clean. Trying it Thursday","Appreciate you 🤝 needed a new routine"];
+let chatWith=null, shareOpen=false;
 function ensureChat(name){ S.chats=S.chats||{}; if(!S.chats[name]) S.chats[name]=[]; return S.chats[name]; }
 function openChat(name){ chatWith=name; shareOpen=false; ensureChat(name); closeModal('friendsModal'); document.getElementById('chatScreen').classList.add('show'); renderChat(); }
 function closeChat(){ document.getElementById('chatScreen').classList.remove('show'); chatWith=null; shareOpen=false; openFriends(); }
@@ -2478,7 +2418,7 @@ function renderChat(){
 function pushChat(name,m){ const log=ensureChat(name); log.push(m); if(log.length>60) S.chats[name]=log.slice(-60); save(); }
 function sendChat(){
   const inp=document.getElementById('chatInput'), t=(inp.value||'').trim(); if(!t) return;
-  pushChat(chatWith,{me:true,text:t,ts:Date.now()}); haptic(15); renderChat(); queueReply(false);
+  pushChat(chatWith,{me:true,text:t,ts:Date.now()}); haptic(15); renderChat();
 }
 function toggleShareRoutine(){
   if(!(S.routines||[]).length){ toast('No routines yet — build one in the Workout tab'); return; }
@@ -2487,23 +2427,13 @@ function toggleShareRoutine(){
 function shareRoutine(i){
   const rt=(S.routines||[])[i]; if(!rt||!chatWith) return;
   pushChat(chatWith,{me:true,routine:{name:rt.name,items:rt.items.map(x=>({...x}))},ts:Date.now()});
-  shareOpen=false; haptic([0,25,30,25]); renderChat(); queueReply(true);
+  shareOpen=false; haptic([0,25,30,25]); renderChat();
 }
 function saveSharedRoutine(ts){
   const log=ensureChat(chatWith), m=log.find(x=>x.ts===ts&&x.routine); if(!m) return;
   S.routines.push({name:m.routine.name+' · '+chatWith, items:m.routine.items.map(x=>({...x}))});
   save(); haptic(25); toast('📋 Saved to your routines');
 }
-function queueReply(wasRoutine){
-  if(chatTimer) clearTimeout(chatTimer);
-  const who=chatWith;
-  chatTimer=setTimeout(()=>{
-    const pool=wasRoutine?CHAT_ROUTINE_REPLIES:CHAT_REPLIES;
-    pushChat(who,{me:false,text:pool[Math.floor(Math.random()*pool.length)],ts:Date.now()});
-    if(chatWith===who) renderChat(); else toast('💬 '+who+' replied');
-  }, 1300+Math.random()*1500);
-}
-
 function declineChallenge(i){ incomingChallenges.splice(i,1); renderFriends(); }
 function acceptChallenge(i){
   const ch=incomingChallenges[i]; if(!ch) return;
