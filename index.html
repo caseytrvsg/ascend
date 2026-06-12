@@ -580,6 +580,7 @@
 <script src="vendor/supabase-js.js"></script>
 <script src="config.js"></script>
 <script src="sync-core.js"></script>
+<script src="scanner.js"></script>
 <script src="backend.js"></script>
 <script>
 /* ============================================================
@@ -2219,7 +2220,7 @@ function fmt(n){ n=Math.round(n); return n>=1000?(n/1000).toFixed(n>=10000?0:1)+
 function fmtClock(ms){ const s=Math.floor(ms/1000), h=Math.floor(s/3600), m=Math.floor(s%3600/60), ss=s%60; return (h?h+':':'')+(h?String(m).padStart(2,'0'):m)+':'+String(ss).padStart(2,'0'); }
 let modalZ=100;   // modals opened later stack above ones already open (e.g. exercise picker over routine builder)
 function openModal(id){ const m=document.getElementById(id); m.style.zIndex=++modalZ; m.classList.add('open'); }
-function closeModal(id){ document.getElementById(id).classList.remove('open'); if(!document.querySelector('.modal.open')) modalZ=100; }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); if(id==='scanModal'&&window.Scanner) Scanner.stop(); if(!document.querySelector('.modal.open')) modalZ=100; }
 let toastT; function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2200); }
 ['exModal','addExModal','routineModal','genModal','composeModal','memoryModal','allMemModal','editModal','finishModal','scanModal','friendsModal','proModal','accountModal'].forEach(id=>document.getElementById(id).addEventListener('click',e=>{ if(e.target.id===id) closeModal(id); }));
 
@@ -2810,13 +2811,6 @@ const FOODS=[
   {name:'Apple',                  emoji:'🍎', serving:'1 medium',kcal:95, p:0, c:25, f:0},
 ];
 const FOODMAP=Object.fromEntries(FOODS.map(f=>[f.name,f]));
-const SCAN_MEALS=[
-  ['Fried Chicken','White Rice','Broccoli'],
-  ['Salmon Fillet','Sweet Potato','Avocado'],
-  ['Whole Eggs','Oats','Banana'],
-  ['Ground Beef 80/20','Pasta'],
-  ['Greek Yogurt','Almonds','Banana'],
-];
 function bwLbs(){ return S.units==='kg' ? S.bw*2.20462 : S.bw; }
 function bwKg(){ return S.units==='kg' ? S.bw : S.bw/2.20462; }
 // Activity multipliers (Harris-Benedict style) for turning BMR into daily burn (TDEE).
@@ -2912,11 +2906,25 @@ function aiPlanCard(){
     ${need?`<div class="tiny" style="color:var(--warn);margin-top:8px;">Add your height & age in Profile → Edit for a precise target${S.bodyFat>0?'':' (or body fat % for a lifter-accurate one)'}.</div>`:''}
   </div>`;
 }
-// ----- AI scan flow -----
+// ----- Meal scan — live camera snap; AI recognition arrives with the scan-meal
+// Edge Function (needs the AI account). Until then: snap, then pick foods manually.
 let scanPhoto=null, scanItems=[], scanView='photo', scanEditIdx=-1, scanQuery='';
-function openScan(){ scanPhoto=null; scanItems=[]; scanView='photo'; scanQuery=''; renderScanSheet(); openModal('scanModal'); }
-function pickScanPhoto(input){ readImage(input,u=>{ scanPhoto=u; scanView='analyzing'; renderScanSheet(); setTimeout(()=>{ runDetect(); scanView='results'; haptic([0,25,40,25]); renderScanSheet(); },1700); }); }
-function runDetect(){ const meal=SCAN_MEALS[Math.floor(Math.random()*SCAN_MEALS.length)]; scanItems=meal.map(n=>({food:FOODMAP[n], mult:1, conf:72+Math.floor(Math.random()*25)})); }
+function openScan(){ scanPhoto=null; scanItems=[]; scanView='photo'; scanQuery=''; renderScanSheet(); openModal('scanModal'); startMealCam(); }
+async function startMealCam(){
+  const v=document.getElementById('mealVideo'); if(!v) return;
+  const res=await Scanner.start(v);
+  const st=document.getElementById('mealCamStatus');
+  if(!res.ok && st) st.textContent = res.reason==='insecure' ? 'Camera needs the secure app address — use the installed app or the https link'
+    : res.reason==='denied' ? 'Camera blocked — allow camera access for ASCEND, or upload a photo below'
+    : 'No camera on this device — upload a photo below';
+}
+function snapMeal(){
+  const v=document.getElementById('mealVideo');
+  if(!v || !v.videoWidth){ toast('Camera not ready — or use Upload below'); return; }
+  scanPhoto=Scanner.snap(v); Scanner.stop();
+  scanItems=[]; scanView='results'; haptic([0,25,40,25]); renderScanSheet();
+}
+function pickScanPhoto(input){ readImage(input,u=>{ Scanner.stop(); scanPhoto=u; scanItems=[]; scanView='results'; haptic([0,25,40,25]); renderScanSheet(); }); }
 function scanTotals(){ const t={kcal:0,p:0,c:0,f:0}; scanItems.forEach(it=>{t.kcal+=it.food.kcal*it.mult;t.p+=it.food.p*it.mult;t.c+=it.food.c*it.mult;t.f+=it.food.f*it.mult;}); return t; }
 function cyclePortion(i){ const o=[0.5,1,1.5,2]; scanItems[i].mult=o[(o.indexOf(scanItems[i].mult)+1)%o.length]; renderScanSheet(); }
 function removeScanItem(i){ scanItems.splice(i,1); renderScanSheet(); }
@@ -2933,52 +2941,83 @@ function logMeal(){
   if(window.cloud && cloud.ready()) S.meals.slice(-scanItems.length).forEach(m=>cloud.mark('meals', m.ts));
   save(); closeModal('scanModal'); haptic([0,30,40,30]); renderNutrition(); toast('Meal logged 🍽️');
 }
-// ----- Barcode scan (exact label data for packaged items; lookup SIMULATED) -----
-// Real app: a barcode reader returns the code -> look it up in a food database
-// (e.g. Open Food Facts) for label-exact macros. Brands here are fictional.
-const PACKAGED=[
-  {code:'5012345 678900', brand:'WheyMax',      name:'Whey Protein — Vanilla', serving:'1 scoop (31g)', kcal:120, p:24, c:3,  f:1.5, emoji:'🥤'},
-  {code:'0049000 014501', brand:'Morning Co.',  name:'Rolled Oats',            serving:'40g',          kcal:150, p:5,  c:27, f:3,   emoji:'🥣'},
-  {code:'0038000 113405', brand:'PureGreek',    name:'Greek Yogurt — Plain',   serving:'170g',         kcal:120, p:20, c:7,  f:0,   emoji:'🥛'},
-  {code:'0072250 905021', brand:'FuelBar',      name:'Protein Bar — Chocolate',serving:'1 bar (40g)',  kcal:190, p:10, c:14, f:12,  emoji:'🍫'},
-  {code:'0021908 500147', brand:'Deli Fresh',   name:'Rotisserie Chicken',     serving:'140g',         kcal:230, p:33, c:0,  f:11,  emoji:'🍗'},
-  {code:'0028000 511209', brand:'Pantry Staple',name:'Baked Beans',            serving:'200g',         kcal:162, p:10, c:26, f:1,   emoji:'🫘'},
-];
-let barcodeProduct=null, bcServings=1, bcTimer=null;
-function openBarcode(){ scanView='barcode'; barcodeProduct=null; bcServings=1; renderScanSheet(); openModal('scanModal');
-  clearTimeout(bcTimer); bcTimer=setTimeout(()=>{ if(scanView!=='barcode') return; barcodeProduct=PACKAGED[Math.floor(Math.random()*PACKAGED.length)]; scanView='product'; haptic([0,30,40,30]); renderScanSheet(); }, 1700); }
+// ----- Barcode scan — live camera decode + Open Food Facts lookup (~3M products) -----
+let barcodeProduct=null, bcServings=1, bcBusy=false;
+function openBarcode(){ scanView='barcode'; barcodeProduct=null; bcServings=1; bcBusy=false; renderScanSheet(); openModal('scanModal'); startBarcodeCam(); }
+async function startBarcodeCam(){
+  const v=document.getElementById('bcVideo'); if(!v) return;
+  const res=await Scanner.start(v, onBarcodeDetected);
+  if(!res.ok){
+    const st=document.getElementById('bcStatus'), fb=document.getElementById('bcFallback');
+    if(st) st.textContent = res.reason==='insecure' ? 'Camera needs the secure app address — use the installed app or the https link'
+      : res.reason==='denied' ? 'Camera blocked — allow camera access for ASCEND in your browser settings'
+      : 'No camera on this device — type the barcode digits instead';
+    if(fb) fb.style.display='block';
+  }
+}
+function bcSetStatus(msg){ const st=document.getElementById('bcStatus'); if(st) st.innerHTML=msg; }
+// Open Food Facts: per-serving macros when the label has them, else per-100g.
+async function lookupBarcode(code){
+  const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,brands,serving_size,image_small_url,nutriments`);
+  if(!r.ok) return null;
+  const j=await r.json(); if(j.status!==1||!j.product) return null;
+  const p=j.product, n=p.nutriments||{};
+  const perServ=n['energy-kcal_serving']!=null;
+  const g=k=>{ const v=perServ?n[k+'_serving']:n[k+'_100g']; return v!=null?+(+v).toFixed(1):0; };
+  const kcal=Math.round(perServ?n['energy-kcal_serving']:(n['energy-kcal_100g']||0));
+  if(!kcal && !n['proteins_100g'] && !n['proteins_serving']) return null;   // listed but no nutrition data
+  return { code, brand:((p.brands||'').split(',')[0]||'').trim(), name:p.product_name||'Unnamed product',
+    serving:perServ?(p.serving_size||'1 serving'):'100g', kcal, p:g('proteins'), c:g('carbohydrates'), f:g('fat'),
+    emoji:'🍽️', photo:p.image_small_url||null };
+}
+async function onBarcodeDetected(code){
+  code=(code||'').replace(/\D/g,''); if(!code) return;
+  if(bcBusy || scanView!=='barcode') return; bcBusy=true;
+  haptic(15); bcSetStatus('Found barcode '+code+' — looking it up…');
+  try{
+    const pr=await lookupBarcode(code);
+    if(scanView!=='barcode'){ bcBusy=false; return; }
+    if(pr){ Scanner.stop(); barcodeProduct=pr; scanView='product'; haptic([0,30,40,30]); renderScanSheet(); }
+    else bcSetStatus(`Barcode ${code} isn't in the food database — try another side of the pack, or <b style="color:var(--accent2);cursor:pointer;" onclick="bcManualFood()">add the food manually</b>`);
+  }catch(e){ bcSetStatus('No connection — barcode lookup needs internet'); }
+  setTimeout(()=>{ bcBusy=false; }, 1400);
+}
+function bcManualFood(){ Scanner.stop(); scanPhoto=null; scanItems=[]; scanEditIdx=-2; scanQuery=''; scanView='pickfood'; renderScanSheet(); }
 function bcStep(d){ bcServings=Math.max(1, bcServings+d); renderScanSheet(); }
 function logBarcode(){ const pr=barcodeProduct; if(!pr) return; const day=new Date().toDateString(); S.meals=S.meals||[];
   S.meals.push({day, ts:Date.now(), name:pr.name, emoji:pr.emoji, serving:pr.serving, mult:bcServings,
     kcal:Math.round(pr.kcal*bcServings), p:+(pr.p*bcServings).toFixed(1), c:+(pr.c*bcServings).toFixed(1), f:+(pr.f*bcServings).toFixed(1)});
   if(window.cloud && cloud.ready()) cloud.mark('meals', S.meals[S.meals.length-1].ts);
   save(); closeModal('scanModal'); haptic([0,30,40,30]); renderNutrition(); toast('Logged '+pr.name); }
-function fauxBarcode(){ const ws=[2,4,1,3,2,5,1,2,4,1,3,2,1,5,2,3,1,2,4,2,1,3,5,1,2,2,4,1,3,2,1,4,2,3]; let x=0,b='';
-  ws.forEach((w,i)=>{ if(i%2===0) b+=`<rect x="${x}" y="0" width="${w}" height="62" fill="#e8e8ee"/>`; x+=w+1; });
-  return `<svg viewBox="0 0 ${x} 62" width="72%" height="62" preserveAspectRatio="none">${b}</svg>`; }
 function renderScanSheet(){
   const el=document.getElementById('scanSheet');
   if(scanView==='barcode'){
     el.innerHTML=`<div class="grab"></div><h2 style="margin:0 0 12px;">Scan a barcode</h2>
-      <div class="bcview"><div class="bcframe">
+      <div class="bcview">
+        <video id="bcVideo" autoplay playsinline muted style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"></video>
+        <div class="bcframe" style="z-index:2;">
         <span class="bccorner" style="top:0;left:0;border-right:none;border-bottom:none;"></span>
         <span class="bccorner" style="top:0;right:0;border-left:none;border-bottom:none;"></span>
         <span class="bccorner" style="bottom:0;left:0;border-right:none;border-top:none;"></span>
         <span class="bccorner" style="bottom:0;right:0;border-left:none;border-top:none;"></span>
-        ${fauxBarcode()}<div class="bcline"></div>
+        <div class="bcline"></div>
       </div></div>
-      <div class="tiny muted" style="text-align:center;margin-top:12px;">${icon('camera',14)} Point at the barcode on the packaging…</div>
+      <div class="tiny muted" id="bcStatus" style="text-align:center;margin-top:12px;line-height:1.5;">${icon('camera',14)} Point at the barcode on the packaging…</div>
+      <div id="bcFallback" style="display:none;margin-top:10px;">
+        <input id="bcManual" inputmode="numeric" placeholder="Type the barcode number" style="margin-bottom:8px;" onkeydown="if(event.key==='Enter')onBarcodeDetected(this.value)">
+        <button class="btn ghost sm" style="width:100%;" onclick="onBarcodeDetected(document.getElementById('bcManual').value)">Look up</button>
+      </div>
       <button class="btn ghost" style="margin-top:12px;" onclick="closeModal('scanModal')">Cancel</button>`; return;
   }
   if(scanView==='product'){
     const pr=barcodeProduct, mk=v=>Math.round(v*bcServings);
     el.innerHTML=`<div class="grab"></div>
-      <div class="row sb" style="margin-bottom:4px;"><h2 style="margin:0;">Product found</h2><span class="conf">✓ verified</span></div>
-      <div class="tiny muted" style="margin-bottom:12px;">Exact label data · barcode ${pr.code}</div>
+      <div class="row sb" style="margin-bottom:4px;"><h2 style="margin:0;">Product found</h2><span class="conf">✓ label data</span></div>
+      <div class="tiny muted" style="margin-bottom:12px;">Open Food Facts · barcode ${pr.code}</div>
       <div class="fooditem" style="margin-bottom:14px;">
-        <div style="font-size:27px;">${pr.emoji}</div>
-        <div class="grow"><div class="tiny" style="color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.4px;">${pr.brand}</div>
-          <div style="font-weight:700;">${pr.name}</div><div class="tiny muted">${pr.serving} per serving · ${pr.kcal} kcal</div></div>
+        ${pr.photo?`<img src="${pr.photo}" style="width:46px;height:46px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#fff;">`:`<div style="font-size:27px;">${pr.emoji}</div>`}
+        <div class="grow">${pr.brand?`<div class="tiny" style="color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.4px;">${escapeAttr(pr.brand)}</div>`:''}
+          <div style="font-weight:700;">${escapeAttr(pr.name)}</div><div class="tiny muted">${escapeAttr(pr.serving)} per serving · ${pr.kcal} kcal</div></div>
       </div>
       <label class="f">Servings</label>
       <div class="row" style="gap:12px;margin-bottom:14px;"><div class="stepper"><button onclick="bcStep(-1)">−</button><div class="n">${bcServings}</div><button onclick="bcStep(1)">＋</button></div>
@@ -2992,15 +3031,14 @@ function renderScanSheet(){
   }
   if(scanView==='photo'){
     el.innerHTML=`<div class="grab"></div><h2 style="margin:0 0 12px;">Scan a meal</h2>
-      <label class="scanzone"><div style="font-size:34px;">📸</div><div style="font-weight:700;margin-top:8px;">Add a meal photo</div>
-        <div class="tiny muted" style="margin-top:4px;">Our AI estimates the macros — you can fix anything it gets wrong.</div>
-        <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="pickScanPhoto(this)"></label>
-      <button class="btn ghost" style="margin-top:12px;" onclick="closeModal('scanModal')">Cancel</button>`; return;
-  }
-  if(scanView==='analyzing'){
-    el.innerHTML=`<div class="grab"></div><h2 style="margin:0 0 12px;">Analyzing…</h2>
-      <div class="scanning"><img src="${scanPhoto}" style="width:100%;display:block;border-radius:16px;"><div class="scanline"></div></div>
-      <div class="tiny muted" style="text-align:center;margin-top:12px;">🤖 Identifying foods and estimating macros…</div>`; return;
+      <div class="bcview" style="height:260px;">
+        <video id="mealVideo" autoplay playsinline muted style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"></video>
+        <div class="tiny muted" id="mealCamStatus" style="position:relative;z-index:2;text-align:center;padding:0 18px;"></div>
+      </div>
+      <button class="btn" style="margin-top:12px;" onclick="snapMeal()">${icon('camera',17)} Snap the plate</button>
+      <label class="btn ghost sm" style="display:block;text-align:center;cursor:pointer;margin-top:8px;">Upload a photo instead
+        <input type="file" accept="image/*" style="display:none;" onchange="pickScanPhoto(this)"></label>
+      <button class="btn ghost" style="margin-top:8px;" onclick="closeModal('scanModal')">Cancel</button>`; return;
   }
   if(scanView==='pickfood'){
     el.innerHTML=`<div class="grab"></div><h2 style="margin:0 0 4px;">${scanEditIdx===-2?'Add a food':'Correct the food'}</h2>
@@ -3012,13 +3050,13 @@ function renderScanSheet(){
   }
   const t=scanTotals();
   el.innerHTML=`<div class="grab"></div>
-    <div class="row sb" style="margin-bottom:8px;"><h2 style="margin:0;">Detected foods</h2><img src="${scanPhoto}" style="width:46px;height:46px;border-radius:10px;object-fit:cover;"></div>
-    <div class="tiny muted" style="margin-bottom:12px;">Not right? Tap ✎ to correct a food, or ×N to adjust the portion.</div>
+    <div class="row sb" style="margin-bottom:8px;"><h2 style="margin:0;">Your meal</h2>${scanPhoto?`<img src="${scanPhoto}" style="width:46px;height:46px;border-radius:10px;object-fit:cover;">`:''}</div>
+    <div class="tiny muted" style="margin-bottom:12px;">${scanItems.length?'Tap ✎ to correct a food, or ×N to adjust the portion.':'Add each food on the plate — AI recognition is coming in a future update.'}</div>
     ${scanItems.map((it,i)=>{ const m=it.food;
       return `<div class="fooditem">
         <div style="font-size:25px;">${m.emoji}</div>
         <div class="grow">
-          <div class="row sb"><div style="font-weight:700;">${m.name}</div>${it.conf<100?`<span class="conf ${it.conf<80?'low':''}">${it.conf}%</span>`:'<span class="conf">✓ edited</span>'}</div>
+          <div class="row sb"><div style="font-weight:700;">${m.name}</div>${it.conf<100?`<span class="conf ${it.conf<80?'low':''}">${it.conf}%</span>`:'<span class="conf">✓</span>'}</div>
           <div class="tiny muted" style="margin:3px 0 6px;">${m.serving} · ×${it.mult} · ${Math.round(m.kcal*it.mult)} kcal</div>
           <div><span class="pchip"><span class="pdot" style="background:#5ad1a0;"></span>P ${Math.round(m.p*it.mult)}</span><span class="pchip"><span class="pdot" style="background:#ffb84d;"></span>C ${Math.round(m.c*it.mult)}</span><span class="pchip"><span class="pdot" style="background:#ff7a9c;"></span>F ${Math.round(m.f*it.mult)}</span></div>
         </div>
