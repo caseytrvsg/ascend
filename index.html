@@ -718,7 +718,11 @@ function fresh(){ return { name:'Athlete', bw:180, units:'lb', heightCm:null, he
   sessions:[], active:null, routines:[], comp:{tier:0, div:0, sr:0, wins:0, losses:0, streak:0}, posts:[], meals:[], pro:false,
   shards:120, owned:['th_mid','bd_none','bn_none'], inv:{}, boost:null, theme:'th_mid', border:'bd_none', banner:'bn_none', deals:null, onboarded:false }; }
   // NOTE: streak state (S.stk / S.stkLost) is intentionally NOT in fresh() — undefined triggers deriveStreak() migration from session history.
-function save(){ localStorage.setItem('ascend', JSON.stringify(S)); }
+function save(){
+  if(window.cloud && cloud.ready()) S.profileUpdatedAt=Date.now();
+  localStorage.setItem('ascend', JSON.stringify(S));
+  if(window.cloud && cloud.ready()) cloud.mark('profile');
+}
 
 // ---------- Custom exercises (user-submitted, pending official review) ----------
 function groupDefaultStd(g){ const arr=EXERCISES.filter(e=>e.group===g&&!e.custom).map(e=>e.std).sort((a,b)=>a-b); return arr.length?arr[Math.floor(arr.length/2)]:1; }
@@ -736,6 +740,7 @@ function submitCustomEx(){
   if(EXERCISES.some(e=>e.name.toLowerCase()===name.toLowerCase())){ toast('That exercise already exists'); return; }
   const c={id:'cx'+Date.now(), name, group, std:groupDefaultStd(group), equip};
   S.customEx=S.customEx||[]; S.customEx.push(c); registerCustomEx(c); save();
+  if(window.cloud && cloud.ready()) cloud.mark('customEx');
   // queue for official review — appends to exercise-requests.md when running on the ASCEND dev server
   fetch('/api/exercise-request',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({name, group, equipment:equip, by:S.name||'Athlete', when:new Date().toISOString()})}).catch(()=>{});
@@ -1285,6 +1290,7 @@ function commitFinish(){
   const prCount=countPRs(a);
   const beforeDet=rankDetail(overallSR()), xpBefore=totalXP(), lvlBefore=levelInfo(xpBefore).level;
   S.sessions.push(a); S.active=null; rest=0;
+  if(window.cloud && cloud.ready()) cloud.mark('sessions', a.start);
   bumpStreak();
   const shard=shardsForSession(a, prCount);
   S.shards=(S.shards||0)+shard.gain;
@@ -1392,9 +1398,10 @@ function saveRoutine(){
   if(!routineDraft.name.trim()){ toast('Name your routine'); return; }
   if(!routineDraft.items.length){ toast('Add an exercise'); return; }
   S.routines.push({name:routineDraft.name.trim(), items:routineDraft.items}); save();
+  if(window.cloud && cloud.ready()) cloud.mark('routines');
   closeModal('routineModal'); renderTrain(); toast('Routine saved');
 }
-function delRoutine(ri){ if(confirm('Delete routine?')){ S.routines.splice(ri,1); save(); renderTrain(); } }
+function delRoutine(ri){ if(confirm('Delete routine?')){ S.routines.splice(ri,1); save(); if(window.cloud && cloud.ready()) cloud.mark('routines'); renderTrain(); } }
 function startRoutine(ri){
   const rt=S.routines[ri];
   S.active={start:Date.now(), exercises:rt.items.map(it=>({id:it.id, sets:Array.from({length:it.sets},()=>({weight:'',reps:'',done:false}))}))};
@@ -2436,6 +2443,7 @@ function shareRoutine(i){
 function saveSharedRoutine(ts){
   const log=ensureChat(chatWith), m=log.find(x=>x.ts===ts&&x.routine); if(!m) return;
   S.routines.push({name:m.routine.name+' · '+chatWith, items:m.routine.items.map(x=>({...x}))});
+  if(window.cloud && cloud.ready()) cloud.mark('routines');
   save(); haptic(25); toast('📋 Saved to your routines');
 }
 function declineChallenge(i){ incomingChallenges.splice(i,1); renderFriends(); }
@@ -2686,6 +2694,7 @@ function logMeal(){
   const day=new Date().toDateString(); S.meals=S.meals||[];
   scanItems.forEach((it,k)=>S.meals.push({day, ts:Date.now()+k, name:it.food.name, emoji:it.food.emoji, serving:it.food.serving, mult:it.mult,
     kcal:Math.round(it.food.kcal*it.mult), p:+(it.food.p*it.mult).toFixed(1), c:+(it.food.c*it.mult).toFixed(1), f:+(it.food.f*it.mult).toFixed(1)}));
+  if(window.cloud && cloud.ready()) S.meals.slice(-scanItems.length).forEach(m=>cloud.mark('meals', m.ts));
   save(); closeModal('scanModal'); haptic([0,30,40,30]); renderNutrition(); toast('Meal logged 🍽️');
 }
 // ----- Barcode scan (exact label data for packaged items; lookup SIMULATED) -----
@@ -2706,6 +2715,7 @@ function bcStep(d){ bcServings=Math.max(1, bcServings+d); renderScanSheet(); }
 function logBarcode(){ const pr=barcodeProduct; if(!pr) return; const day=new Date().toDateString(); S.meals=S.meals||[];
   S.meals.push({day, ts:Date.now(), name:pr.name, emoji:pr.emoji, serving:pr.serving, mult:bcServings,
     kcal:Math.round(pr.kcal*bcServings), p:+(pr.p*bcServings).toFixed(1), c:+(pr.c*bcServings).toFixed(1), f:+(pr.f*bcServings).toFixed(1)});
+  if(window.cloud && cloud.ready()) cloud.mark('meals', S.meals[S.meals.length-1].ts);
   save(); closeModal('scanModal'); haptic([0,30,40,30]); renderNutrition(); toast('Logged '+pr.name); }
 function fauxBarcode(){ const ws=[2,4,1,3,2,5,1,2,4,1,3,2,1,5,2,3,1,2,4,2,1,3,5,1,2,2,4,1,3,2,1,4,2,3]; let x=0,b='';
   ws.forEach((w,i)=>{ if(i%2===0) b+=`<rect x="${x}" y="0" width="${w}" height="62" fill="#e8e8ee"/>`; x+=w+1; });
@@ -2795,6 +2805,15 @@ function renderScanSheet(){
 applyTheme();
 if(!S.onboarded && !S.sessions.length) startOnboarding();
 renderTrain();
+// Cloud: restore session, pull account data, then refresh whatever's on screen.
+window.S = S;
+if(window.cloud && cloud.configured) cloud.init().then(u=>{
+  if(!u) return;
+  cloud.pullAll().then(()=>{ localStorage.setItem('ascend', JSON.stringify(S)); applyTheme();
+    const cur=document.querySelector('.screen.active'); go(cur?cur.id.replace('screen-',''):'train');
+  }).catch(()=>{});
+  cloud.syncNow();
+});
 // Swipe-down to dismiss any bottom sheet (drag from the top, or anywhere when the sheet is scrolled to top)
 document.querySelectorAll('.modal').forEach(mod=>{
   const sheet=mod.querySelector('.sheet'); if(!sheet) return;
