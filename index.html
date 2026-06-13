@@ -707,64 +707,61 @@ const DIV_LABELS=['1','2','3'];          // division 1 (lowest) -> 3 (highest)
 // Original game-style emblem. Optional `division` (1-3) draws chevrons; Ascended gets rays.
 // Swap in your own art: set USE_IMG=true and add icons/<rankname>.png.
 const USE_IMG=false;
-// Distinct silhouette per rank so tiers read apart, not just recolored.
-// All centred in the 100×100 box, ~radius 32, leaving room for flourishes + pips.
-function rankShapeD(tier){
-  const cx=50, cy=50;
-  const poly=(n,r,rot)=>{ let p=''; for(let i=0;i<n;i++){ const a=(rot+i*360/n)*Math.PI/180; p+=(i?'L':'M')+(cx+r*Math.cos(a)).toFixed(1)+' '+(cy+r*Math.sin(a)).toFixed(1)+' '; } return p+'Z'; };
-  const star=(pts,ro,ri,rot)=>{ let p=''; for(let i=0;i<pts*2;i++){ const r=(i%2?ri:ro), a=(rot+i*180/pts)*Math.PI/180; p+=(i?'L':'M')+(cx+r*Math.cos(a)).toFixed(1)+' '+(cy+r*Math.sin(a)).toFixed(1)+' '; } return p+'Z'; };
-  switch(tier){
-    case 0: return 'M32 24 H68 Q78 24 78 34 V66 Q78 76 68 76 H32 Q22 76 22 66 V34 Q22 24 32 24 Z';   // rounded tile
-    case 1: return 'M20 50 a30 30 0 1 0 60 0 a30 30 0 1 0 -60 0 Z';                                    // coin
-    case 2: return poly(5,33,-90);                                                                     // pentagon
-    case 3: return poly(6,33,-90);                                                                     // hexagon
-    case 4: return 'M50 18 L79 29 L74 62 L50 84 L26 62 L21 29 Z';                                      // shield
-    case 5: return poly(8,32,-67.5);                                                                   // octagon
-    case 6: return star(5,35,15,-90);                                                                  // 5-point star
-    case 7: return 'M20 50 a30 30 0 1 0 60 0 a30 30 0 1 0 -60 0 Z';                                    // medallion (laurel/crown flourish)
-    default: return star(8,33,19,-90);                                                                 // radiant 8-point star
-  }
+// Mix a hex colour toward white (1) or black (0) by t — gives metallic shading per rank.
+function mixHex(hex, toWhite, t){
+  const a=parseInt(hex.slice(1),16), r=(a>>16)&255, g=(a>>8)&255, b=a&255, tv=toWhite?255:0, m=v=>Math.round(v+(tv-v)*t);
+  return '#'+[m(r),m(g),m(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
 }
+// A real game-style rank crest: metallic frame + faceted gem + escalating wings + glow.
+// Detailed at larger sizes; a clean compact crest at small sizes (leaderboard/feed).
 function rankEmblem(rk, px, division){
   if(USE_IMG) return `<img src="icons/${rk.name.toLowerCase()}.png" width="${px}" height="${px}" style="object-fit:contain;display:block;" alt="${rk.name}">`;
-  const c=rk.color, tier=RANKS.indexOf(rk), uid=tier+'_'+px, d=rankShapeD(tier);
-  // Flourishes + division pips only at larger sizes — keeps leaderboard/feed crisp.
-  const big = px>=40;
-  // Wings — Middleweight (4) and up, growing with tier.
+  const c=rk.color, tier=RANKS.indexOf(rk), uid=tier+'_'+px, big=px>=44;
+  const light=mixHex(c,1,.5), pale=mixHex(c,1,.78), dark=mixHex(c,0,.42), deep=mixHex(c,0,.6);
+  const CREST='M50 9 L79 24 L75 57 L50 88 L25 57 L21 24 Z';      // outer crest
+  const INNER='M50 18 L71 29 L68 53 L50 78 L32 53 L29 29 Z';     // inner bevel
+  const GEM='M50 33 L64 46 L50 67 L36 46 Z';                     // faceted gem
+  // Layered filled wings, growing with tier (big sizes only).
   let wings='';
-  if(big && tier>=4){
-    const span = [0,0,0,0,17,21,25,29,32][tier], nf = tier>=6?3:2;
-    const wing=dir=>{ let p=''; const ax=50+dir*16, ay=34;
-      for(let i=0;i<nf;i++){ const len=span-i*5.2, y=ay+i*7.4, ex=ax+dir*len, ey=y+3+i*1.6;
-        p+=`<path d="M${ax} ${y} C ${ax+dir*len*0.45} ${y-7} ${ax+dir*len*0.85} ${y-3} ${ex} ${ey}" stroke="${c}" stroke-width="${(2.6-i*0.3).toFixed(1)}" fill="none" stroke-linecap="round" opacity="${(0.9-i*0.13).toFixed(2)}"/>`; }
+  if(big && tier>=2){
+    const nf=Math.min(4, tier-1), reach=[0,0,16,20,24,28,31,34,36][tier];
+    const wing=dir=>{ let p=''; const ax=50+dir*22, ay=30;
+      for(let i=0;i<nf;i++){ const len=reach-i*4.5, y=ay+i*7, ty=y-9-i*1.2, ex=ax+dir*len;
+        p+=`<path d="M${ax} ${y} Q ${ax+dir*len*0.55} ${(y+ty)/2-3} ${ex} ${ty} Q ${ax+dir*len*0.5} ${y+3} ${ax} ${y+5} Z" fill="url(#wg${uid})" stroke="${deep}" stroke-width="0.6" opacity="${(0.96-i*0.07).toFixed(2)}"/>`; }
       return p; };
-    wings = wing(1)+wing(-1);
+    wings=wing(1)+wing(-1);
   }
-  // Rays — Olympian (7) subtle, Ascended (8) full.
-  let rays='';
-  if(big && tier>=7){ const outer=tier===8?50:48, w=tier===8?3:2.2, op=tier===8?1:0.7;
-    for(let a=0;a<12;a++){ const ang=a*30*Math.PI/180,x1=50+Math.cos(ang)*46,y1=50+Math.sin(ang)*46,x2=50+Math.cos(ang)*outer,y2=50+Math.sin(ang)*outer;
-      rays+=`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${c}" stroke-width="${w}" stroke-linecap="round" opacity="${op}"/>`; } }
-  // Crown — Olympian (7) and Ascended (8), perched above the badge.
-  let crown='';
-  if(big && tier>=7){ crown=`<path d="M40 5 L43 -3 L47 1 L50 -7 L53 1 L57 -3 L60 5 Z" fill="${c}" stroke="#0a0a0f" stroke-opacity=".4" stroke-width="1.1" stroke-linejoin="round"/>
-    <circle cx="50" cy="-7" r="2.1" fill="#fff" opacity=".9"/><circle cx="43" cy="-3" r="1.3" fill="#fff" opacity=".7"/><circle cx="57" cy="-3" r="1.3" fill="#fff" opacity=".7"/>`; }
-  // Division pips below the badge (1–3).
-  let pips=''; const n=division||0;
-  if(big && n){ for(let i=0;i<n;i++){ const x=50+(i-(n-1)/2)*9; pips+=`<circle cx="${x.toFixed(1)}" cy="91" r="3" fill="${c}" stroke="#0a0a0f" stroke-opacity=".5" stroke-width="1"/>`; } }
+  // Rays + crown for the top two tiers.
+  let rays='',crown='';
+  if(big && tier>=7){
+    const outer=tier===8?52:49, w=tier===8?2.6:2, op=tier===8?0.95:0.65;
+    for(let a=0;a<16;a++){ const ang=(a*22.5-90)*Math.PI/180,x1=50+Math.cos(ang)*44,y1=50+Math.sin(ang)*44,x2=50+Math.cos(ang)*outer,y2=50+Math.sin(ang)*outer;
+      rays+=`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${pale}" stroke-width="${w}" stroke-linecap="round" opacity="${op}"/>`; }
+    crown=`<path d="M40 9 L43 0 L47 5 L50 -4 L53 5 L57 0 L60 9 Z" fill="url(#fr${uid})" stroke="${deep}" stroke-width="1" stroke-linejoin="round"/>
+      <circle cx="50" cy="-4" r="2.2" fill="${pale}"/><circle cx="43" cy="0" r="1.4" fill="${pale}"/><circle cx="57" cy="0" r="1.4" fill="${pale}"/>`;
+  }
+  // Division base tab (big) or pips text carries it.
+  let tab='';
+  const n=division||0;
+  if(big && n){ const tabC=n===1?dark:n===2?light:pale; tab=`<path d="M${50-7*1} 84 L50 84 L50 96 L${50-9} 90 Z M${50+7*1} 84 L50 84 L50 96 L${50+9} 90 Z" fill="${tabC}" stroke="${deep}" stroke-width="0.8" stroke-linejoin="round"/>
+    ${[...Array(n)].map((_,i)=>`<circle cx="${50+(i-(n-1)/2)*7}" cy="89" r="1.7" fill="#fff" opacity=".9"/>`).join('')}`; }
+  const glow = big ? `<ellipse cx="50" cy="48" rx="46" ry="46" fill="url(#gl${uid})"/>` : '';
   return `<svg width="${px}" height="${px}" viewBox="0 0 100 100" style="display:block;overflow:visible;">
-    <defs><linearGradient id="g${uid}" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset="0.05" stop-color="${c}"/><stop offset="1" stop-color="${c}" stop-opacity=".5"/>
-    </linearGradient><clipPath id="cl${uid}"><path d="${d}"/></clipPath></defs>
-    ${rays}${wings}
-    <path d="${d}" fill="url(#g${uid})" stroke="${c}" stroke-width="3" stroke-linejoin="round"/>
-    <g clip-path="url(#cl${uid})">
-      <rect x="0" y="0" width="100" height="50" fill="#fff" opacity=".15"/>
-      <ellipse cx="38" cy="30" rx="22" ry="13" fill="#fff" opacity=".12"/>
-      <rect x="0" y="62" width="100" height="40" fill="#000" opacity=".10"/>
-    </g>
-    <circle cx="38" cy="29" r="2" fill="#fff" opacity=".7"/>
-    ${pips}${crown}</svg>`;
+    <defs>
+      <linearGradient id="fr${uid}" x1="0" y1="0" x2="0.2" y2="1"><stop offset="0" stop-color="${light}"/><stop offset=".45" stop-color="${c}"/><stop offset="1" stop-color="${dark}"/></linearGradient>
+      <linearGradient id="gm${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${pale}"/><stop offset=".55" stop-color="${c}"/><stop offset="1" stop-color="${dark}"/></linearGradient>
+      <linearGradient id="wg${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${pale}"/><stop offset="1" stop-color="${dark}"/></linearGradient>
+      <radialGradient id="gl${uid}" cx="50%" cy="48%" r="50%"><stop offset="0" stop-color="${c}" stop-opacity=".55"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></radialGradient>
+    </defs>
+    ${glow}${rays}${wings}
+    <path d="${CREST}" fill="url(#fr${uid})" stroke="${deep}" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="${CREST}" fill="none" stroke="${pale}" stroke-width="1" stroke-linejoin="round" opacity=".6" transform="scale(.93)" transform-origin="50 48"/>
+    <path d="${INNER}" fill="none" stroke="${deep}" stroke-width="1.4" stroke-linejoin="round" opacity=".7"/>
+    <path d="${GEM}" fill="url(#gm${uid})" stroke="${deep}" stroke-width="1.1" stroke-linejoin="round"/>
+    <path d="M50 33 L50 67 M36 46 L64 46" stroke="${deep}" stroke-width="0.7" opacity=".5"/>
+    <path d="M50 33 L57 46 L50 50 L43 46 Z" fill="#fff" opacity=".28"/>
+    <path d="M50 33 L43 46 L50 50 Z" fill="#fff" opacity=".12"/>
+    ${tab}${crown}</svg>`;
 }
 
 // ---------- Icon system ----------
