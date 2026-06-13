@@ -211,7 +211,64 @@ window.cloud = (() => {
   };
   const deletePost = async postId => { const { error } = await sb.from('posts').delete().eq('id', postId); if (error) throw error; };
 
-  // live nudges / friend requests / feed while the app is open
+  // ---- duels (Phase 5)
+  const uploadProof = async (dataUrl) => {
+    if (!dataUrl) return null;
+    try { const blob = await (await fetch(dataUrl)).blob(); const path = `${me()}/duel_${Date.now()}.jpg`;
+      const { error } = await sb.storage.from('post-media').upload(path, blob, { contentType:'image/jpeg' });
+      return error ? null : path; } catch (e) { return null; }
+  };
+  const challengeDuel = async (opponentId, exId) => {
+    const { error } = await sb.from('duels').insert({ challenger: me(), opponent: opponentId, ex_id: exId, status: 'pending' });
+    if (error) throw error;
+  };
+  const listDuels = async () => {
+    const { data } = await sb.from('duels')
+      .select('*, c:profiles!duels_challenger_fkey(id,username,sr,comp), o:profiles!duels_opponent_fkey(id,username,sr,comp)')
+      .order('created_at', { ascending:false }).limit(40);
+    const uid = me();
+    return (data || []).map(d => ({ ...d, iAmChallenger: d.challenger === uid,
+      meSide: d.challenger === uid ? 'c' : 'o', them: d.challenger === uid ? d.o : d.c }));
+  };
+  const respondDuel = async (id, accept) => {
+    const { error } = accept ? await sb.from('duels').update({ status:'active' }).eq('id', id)
+                             : await sb.from('duels').update({ status:'declined' }).eq('id', id);
+    if (error) throw error;
+  };
+  const submitDuel = async (id, side, weight, photoDataUrl) => {
+    const path = await uploadProof(photoDataUrl);
+    const patch = side === 'c'
+      ? { c_weight: weight, c_photo: path, c_at: new Date().toISOString() }
+      : { o_weight: weight, o_photo: path, o_at: new Date().toISOString() };
+    const { error } = await sb.from('duels').update(patch).eq('id', id);
+    if (error) throw error;
+    // if both sides are now in, ask the server to resolve (sets winner + SR on both)
+    const { data: d } = await sb.from('duels').select('c_weight,o_weight,status,winner').eq('id', id).single();
+    if (d && d.status === 'active' && !d.winner && d.c_weight != null && d.o_weight != null) {
+      const { data: { session } } = await sb.auth.getSession();
+      try { await fetch(window.ASCEND_SUPABASE_URL + '/functions/v1/resolve-duel', {
+        method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+session.access_token, 'apikey':window.ASCEND_SUPABASE_KEY },
+        body: JSON.stringify({ duel_id: id }) }); } catch (e) {}
+    }
+  };
+  const signedProof = async (path) => { if (!path) return null;
+    try { const { data } = await sb.storage.from('post-media').createSignedUrl(path, 3600); return data && data.signedUrl; } catch (e) { return null; } };
+
+  // ---- chat (Phase 5)
+  const getMessages = async (friendId) => {
+    const { data } = await sb.from('messages').select('*')
+      .or(`and(from_user.eq.${me()},to_user.eq.${friendId}),and(from_user.eq.${friendId},to_user.eq.${me()})`)
+      .order('created_at', { ascending:true }).limit(200);
+    const uid = me();
+    return (data || []).map(m => ({ id:m.id, me: m.from_user === uid, text:m.text, routine:m.routine, ts:new Date(m.created_at).getTime() }));
+  };
+  const sendMessage = async (toId, text, routine) => {
+    const { data, error } = await sb.from('messages').insert({ from_user: me(), to_user: toId, text: text||null, routine: routine||null }).select('id,created_at').single();
+    if (error) throw error;
+    return data;
+  };
+
+  // live nudges / friend requests / feed / duels / messages while the app is open
   let rtChannel = null, socialCb = () => {};
   const startRealtime = () => {
     if (!ready() || rtChannel) return;
@@ -220,6 +277,8 @@ window.cloud = (() => {
       .on('postgres_changes', { event:'*', schema:'public', table:'friendships' }, p => socialCb({ type:'friend', row:p.new || p.old }))
       .on('postgres_changes', { event:'*', schema:'public', table:'posts' }, p => socialCb({ type:'post', row:p.new || p.old }))
       .on('postgres_changes', { event:'*', schema:'public', table:'likes' }, p => socialCb({ type:'like', row:p.new || p.old }))
+      .on('postgres_changes', { event:'*', schema:'public', table:'duels' }, p => socialCb({ type:'duel', row:p.new || p.old }))
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages', filter:'to_user=eq.'+me() }, p => socialCb({ type:'message', row:p.new }))
       .subscribe();
   };
 
@@ -237,6 +296,8 @@ window.cloud = (() => {
     searchUsers, sendFriendRequest, respondFriend, listFriendships, sendNudge, listNudges, markNudgeSeen,
     getLeaderboard, startRealtime, onSocial: f => { socialCb = f; },
     createPost, getFeed, toggleLike, deletePost,
+    challengeDuel, listDuels, respondDuel, submitDuel, signedProof,
+    getMessages, sendMessage,
     pushSupported, pushEnabled, enablePush, disablePush,
     user: () => user, configured: !!sb, onAuthChange: f => { onChange = f; } };
 })();
