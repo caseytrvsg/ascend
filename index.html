@@ -696,7 +696,7 @@ const RANKS = [
   {name:'Welterweight',      color:'#ffc23a'},
   {name:'Middleweight',      color:'#45d6c0'},
   {name:'Heavyweight',       color:'#6f8fb0'},
-  {name:'Super Heavyweight', color:'#b06bff'},
+  {name:'Champion',          color:'#b06bff'},
   {name:'Olympian',          color:'#ff3b6b'},
   {name:'Ascended',          color:'#fff0a8'},
 ];
@@ -709,21 +709,41 @@ const DIV_LABELS=['1','2','3'];          // division 1 (lowest) -> 3 (highest)
 const USE_IMG=false;
 function rankEmblem(rk, px, division){
   if(USE_IMG) return `<img src="icons/${rk.name.toLowerCase()}.png" width="${px}" height="${px}" style="object-fit:contain;display:block;" alt="${rk.name}">`;
-  const c=rk.color, id='g'+RANKS.indexOf(rk)+'_'+px, ascended=rk.name==='Ascended';
+  const c=rk.color, tier=RANKS.indexOf(rk), id='g'+tier+'_'+px;
+  // Flourishes escalate with rank but only at larger sizes — keeps leaderboard/feed crisp.
+  const big = px>=40;
   let chev=''; const n=division||0; for(let i=0;i<n;i++){ const y=72-i*9; chev+=`<path d="M38 ${y} L50 ${y-7} L62 ${y}" stroke="#0a0a0f" stroke-opacity=".4" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`; }
-  let rays=''; if(ascended){ for(let a=0;a<12;a++){ const ang=a*30*Math.PI/180,x1=50+Math.cos(ang)*46,y1=50+Math.sin(ang)*46,x2=50+Math.cos(ang)*49,y2=50+Math.sin(ang)*49; rays+=`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${c}" stroke-width="3" stroke-linecap="round"/>`; } }
+  // Wings — Middleweight (4) and up, growing with tier.
+  let wings='';
+  if(big && tier>=4){
+    const span = [0,0,0,0,17,21,25,29,32][tier], nf = tier>=6?3:2;
+    const wing=dir=>{ let p=''; const ax=50+dir*15, ay=33;
+      for(let i=0;i<nf;i++){ const len=span-i*5.2, y=ay+i*7.4, ex=ax+dir*len, ey=y+3+i*1.6;
+        p+=`<path d="M${ax} ${y} C ${ax+dir*len*0.45} ${y-7} ${ax+dir*len*0.85} ${y-3} ${ex} ${ey}" stroke="${c}" stroke-width="${(2.6-i*0.3).toFixed(1)}" fill="none" stroke-linecap="round" opacity="${(0.9-i*0.13).toFixed(2)}"/>`; }
+      return p; };
+    wings = wing(1)+wing(-1);
+  }
+  // Rays — Olympian (7) subtle, Ascended (8) full.
+  let rays='';
+  if(big && tier>=7){ const outer=tier===8?50:48, w=tier===8?3:2.2, op=tier===8?1:0.7;
+    for(let a=0;a<12;a++){ const ang=a*30*Math.PI/180,x1=50+Math.cos(ang)*46,y1=50+Math.sin(ang)*46,x2=50+Math.cos(ang)*outer,y2=50+Math.sin(ang)*outer;
+      rays+=`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${c}" stroke-width="${w}" stroke-linecap="round" opacity="${op}"/>`; } }
+  // Crown — Olympian (7) and Ascended (8), perched above the shield.
+  let crown='';
+  if(big && tier>=7){ crown=`<path d="M40 5 L43 -3 L47 1 L50 -7 L53 1 L57 -3 L60 5 Z" fill="${c}" stroke="#0a0a0f" stroke-opacity=".4" stroke-width="1.1" stroke-linejoin="round"/>
+    <circle cx="50" cy="-7" r="2.1" fill="#fff" opacity=".9"/><circle cx="43" cy="-3" r="1.3" fill="#fff" opacity=".7"/><circle cx="57" cy="-3" r="1.3" fill="#fff" opacity=".7"/>`; }
   return `<svg width="${px}" height="${px}" viewBox="0 0 100 100" style="display:block;overflow:visible;">
     <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="0" stop-color="${c}"/><stop offset="1" stop-color="${c}" stop-opacity=".55"/>
     </linearGradient></defs>
-    ${rays}
+    ${rays}${wings}
     <path d="M50 6 L86 22 L80 64 L50 94 L20 64 L14 22 Z" fill="url(#${id})" stroke="${c}" stroke-width="3" stroke-linejoin="round"/>
     <path d="M50 14 L50 60 L22 26 Z" fill="#fff" fill-opacity=".18"/>
     <path d="M50 14 L78 26 L50 60 Z" fill="#000" fill-opacity=".13"/>
     <path d="M50 60 L80 64 L50 94 L20 64 Z" fill="#000" fill-opacity=".09"/>
     <path d="M50 11 L82.3 25.4 L76.8 61.4 L50 88.6 L23.2 61.4 L17.7 25.4 Z" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="1.3" stroke-linejoin="round"/>
     <circle cx="35" cy="19.5" r="2" fill="#fff" opacity=".75"/>
-    ${chev}</svg>`;
+    ${chev}${crown}</svg>`;
 }
 
 // ---------- Icon system ----------
