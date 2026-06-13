@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
       try {
         await webpush.sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-          JSON.stringify({ title: `You were nudged by ${nudge.sender?.username || 'a friend'} 👋`, body: '', tag: 'nudge' }),
+          JSON.stringify({ title: 'ASCEND', body: `You were nudged by ${nudge.sender?.username || 'a friend'} 👋`, tag: 'nudge' }),
         );
         sent++;
       } catch (e) {
