@@ -39,7 +39,9 @@ Deno.serve(async (req) => {
       try {
         await webpush.sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-          JSON.stringify({ title: `You were nudged by ${nudge.sender?.username || 'a friend'} 👋`, body: '', tag: 'nudge' }),
+          // Operator-specified format: title ASCEND, body "you were nudged by (user) 👋".
+          // NOTE: iOS inserts its own "from ASCEND" subtitle on ALL web-app pushes — not removable.
+          JSON.stringify({ title: 'ASCEND', body: `you were nudged by ${nudge.sender?.username || 'a friend'} 👋`, tag: 'nudge' }),
         );
         sent++;
       } catch (e) {
