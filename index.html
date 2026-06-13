@@ -3290,7 +3290,22 @@ document.querySelectorAll('.modal').forEach(mod=>{
 });
 // PWA: offline cache (service workers need HTTPS or localhost — silently skipped on plain LAN HTTP)
 if('serviceWorker' in navigator && (location.protocol==='https:'||['localhost','127.0.0.1'].includes(location.hostname))){
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
+  const isDev=['localhost','127.0.0.1'].includes(location.hostname);
+  const hadController=!!navigator.serviceWorker.controller;   // true ⇒ this is an update, not a first install
+  navigator.serviceWorker.register('sw.js').then(reg=>{
+    setInterval(()=>reg.update().catch(()=>{}), 60*60*1000);  // check for a new version hourly
+    reg.addEventListener('updatefound',()=>{ const nw=reg.installing; if(!nw) return;
+      nw.addEventListener('statechange',()=>{ if(nw.state==='activated' && hadController && !isDev) showUpdateBar(); }); });
+  }).catch(()=>{});
+}
+// Non-disruptive "a new version is ready" prompt — never auto-reloads mid-session.
+function showUpdateBar(){
+  if(document.getElementById('updBar')) return;
+  const b=document.createElement('div'); b.id='updBar';
+  b.style.cssText='position:fixed;left:50%;bottom:calc(108px + var(--safe-bottom,0px));transform:translateX(-50%);z-index:260;background:var(--accent);color:#fff;font-weight:800;font-size:14px;padding:11px 18px;border-radius:14px;box-shadow:0 10px 30px -10px #000;cursor:pointer;white-space:nowrap;';
+  b.innerHTML='ASCEND updated — tap to refresh';
+  b.onclick=()=>{ try{ if(window.cloud&&cloud.ready()) cloud.syncNow(); }catch(e){} location.reload(); };
+  document.body.appendChild(b);
 }
 </script>
 </body>
