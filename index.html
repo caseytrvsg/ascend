@@ -300,6 +300,18 @@
   .bccorner{position:absolute; width:26px; height:26px; border:3px solid var(--accent2);}
   .bcline{position:absolute; left:6%; right:6%; height:2px; background:#ff4d6d; box-shadow:0 0 10px 1px #ff4d6d; animation:bcmove 1.3s ease-in-out infinite;}
   @keyframes bcmove{0%{top:14%;}50%{top:86%;}100%{top:14%;}}
+  /* perspective rank ladder */
+  .ladderWrap{position:relative; margin:0 -16px; overflow:hidden;}
+  .ladderBeam{position:absolute; top:0; bottom:0; left:50%; transform:translateX(-50%); width:74%; clip-path:polygon(44% 0,56% 0,100% 100%,0 100%); pointer-events:none; z-index:0;}
+  .rung{position:relative; z-index:1; display:grid; grid-template-columns:1fr 96px 1fr; align-items:center; gap:6px; padding:10px 16px; min-height:108px;}
+  .rung .rn{font-weight:900; font-size:17px; letter-spacing:.3px; text-transform:uppercase;}
+  .rung.me{background:linear-gradient(90deg,transparent, color-mix(in srgb, var(--accent) 26%, transparent), transparent);}
+  .rung.me::before,.rung.me::after{content:''; position:absolute; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,var(--accent),transparent);}
+  .rung.me::before{top:0;} .rung.me::after{bottom:0;}
+  .lright{display:flex; align-items:center; justify-content:flex-end; gap:5px; flex-wrap:wrap;}
+  .lav{width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:11px; color:#fff; border:2px solid var(--bg);}
+  .lav.me{width:40px; height:40px; font-size:14px; border-color:var(--accent);}
+  .ladderDim{opacity:.62;}
 </style>
 </head>
 <body>
@@ -1610,7 +1622,7 @@ function renderRank(){
   document.getElementById('rankOverview').style.display = rankSub==='rank'?'block':'none';
   document.getElementById('rankBodygraph').style.display = rankSub==='body'?'block':'none';
   document.getElementById('rankLeagues').style.display = rankSub==='leagues'?'block':'none';
-  if(rankSub==='rank') renderOverview(); else if(rankSub==='body') renderBodygraph(); else renderBoard();
+  if(rankSub==='rank') renderOverview(); else if(rankSub==='body') renderBodygraph(); else renderLadder();
 }
 function renderOverview(){
   const sr=overallSR(), det=rankDetail(sr), r=det.rank, nx=nextRank(sr);
@@ -1784,11 +1796,11 @@ function toggleGroup(g){ openGroups[g]=!openGroups[g]; renderBodygraph(); }
 // ---------- LEADERBOARD (cloud-backed) ----------
 // Global = every ASCEND account ordered by cached SR; Friends = accepted friends + you.
 let scope='global', lbCache=null, lbAt=0, lbLoading=false;
-function setScope(el,s){ document.querySelectorAll('#boardScope .chip').forEach(c=>c.classList.remove('on')); el.classList.add('on'); scope=s; renderBoard(); }
+function setScope(el,s){ document.querySelectorAll('#boardScope .chip').forEach(c=>c.classList.remove('on')); el.classList.add('on'); scope=s; renderLadder(); }
 async function refreshBoard(){
   if(!(window.cloud&&cloud.ready())||lbLoading) return;
   lbLoading=true;
-  try{ lbCache=await cloud.getLeaderboard(); lbAt=Date.now(); renderBoard(true); }catch(e){}
+  try{ lbCache=await cloud.getLeaderboard(); lbAt=Date.now(); fromRefreshGuard=true; if(rankSub==='leagues') renderLadder(); else renderBoard(true); fromRefreshGuard=false; }catch(e){}
   lbLoading=false;
 }
 function renderBoard(fromRefresh){
@@ -1817,6 +1829,33 @@ function renderBoard(fromRefresh){
   + (pool.length===1?emptyState('users', scope==='friends'?'No friends on the board yet':'Just you out here',
       scope==='friends'?'Add friends in the Social tab — accepted friends appear here automatically.':'Get your friends on ASCEND — everyone with an account shows up here, ranked by SR.'):'');
 }
+// Perspective rank ladder — every tier/division stacked, your spot lit up, friends placed where they sit.
+function divRoman(d){ return d?(['','I','II','III'][d]||''):''; }
+function renderLadder(){
+  const mySR=overallSR(), myDet=rankDetail(mySR), myTier=RANKS.indexOf(myDet.rank), myDiv=myDet.division, signedIn=window.cloud&&cloud.ready();
+  if(!fromRefreshGuard && signedIn && (!lbCache || Date.now()-lbAt>30000)) refreshBoard();
+  let others=[];
+  if(signedIn){
+    if(scope==='friends') others=FR.friends.map(f=>f.other).filter(Boolean).map(u=>({n:u.username, sr:u.sr||0}));
+    else others=(lbCache||[]).filter(u=>u.id!==cloud.user().id).map(u=>({n:u.username, sr:u.sr||0}));
+  }
+  const rungs=[]; for(let t=ASC;t>=0;t--){ if(t===ASC) rungs.push({t,d:null}); else for(let d=3;d>=1;d--) rungs.push({t,d}); }
+  const body=rungs.map(rg=>{
+    const rk=RANKS[rg.t], isMe=(rg.t===myTier && (rg.t===ASC || rg.d===myDiv));
+    const here=others.filter(u=>{ const od=rankDetail(u.sr); return RANKS.indexOf(od.rank)===rg.t && (rg.t===ASC || od.division===rg.d); });
+    const av = (isMe?`<div class="lav me" style="background:${rk.color};">${(S.name||'Y').slice(0,2).toUpperCase()}</div>`:'')
+      + here.slice(0,3).map(u=>`<div class="lav" style="background:${rankFor(u.sr).color};">${u.n.slice(0,2).toUpperCase()}</div>`).join('')
+      + (here.length>3?`<span class="tiny muted">+${here.length-3}</span>`:'');
+    return `<div class="rung ${isMe?'me':'ladderDim'}" ${isMe?'id="myRung"':''}>
+      <div class="rn" style="color:${rk.color};">${rk.name}<span style="opacity:.65;"> ${divRoman(rg.d)}</span></div>
+      <div style="display:flex;justify-content:center;">${rankEmblem(rk, isMe?92:78, rg.d)}</div>
+      <div class="lright">${isMe?'<span class="tiny" style="color:var(--accent2);font-weight:900;letter-spacing:.5px;">YOU</span>':''}${av}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('board').innerHTML=`<div class="ladderWrap"><div class="ladderBeam" style="background:linear-gradient(180deg,transparent,${myDet.rank.color}1f 45%,${myDet.rank.color}38);"></div>${body}</div>`;
+  setTimeout(()=>{ const m=document.getElementById('myRung'); if(m) m.scrollIntoView({block:'center',behavior:'auto'}); },70);
+}
+let fromRefreshGuard=false;
 
 // ---------- PROFILE ----------
 // ---------- Pro (subscription gate) ----------
