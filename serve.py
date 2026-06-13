@@ -41,6 +41,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+    def end_headers(self):
+        # Dev server: never let the browser cache, so edits always load on reload.
+        # (Production is GitHub Pages + the network-first service worker.)
+        self.send_header("Cache-Control", "no-store, must-revalidate")
+        super().end_headers()
+
     def log_message(self, *args):
         pass  # keep the console quiet
 

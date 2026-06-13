@@ -171,13 +171,55 @@ window.cloud = (() => {
     const { data } = await sb.from('profiles').select('id,username,sr').order('sr', { ascending:false }).limit(100);
     return data || [];
   };
-  // live nudges / friend requests while the app is open
+  // ---- feed (Phase 4): posts + likes
+  const createPost = async (type, payload, mediaDataUrl) => {
+    const uid = me(); let media_path = null;
+    if (mediaDataUrl) {
+      try {
+        const blob = await (await fetch(mediaDataUrl)).blob();
+        const path = `${uid}/${Date.now()}.jpg`;
+        const { error } = await sb.storage.from('post-media').upload(path, blob, { contentType:'image/jpeg', upsert:false });
+        if (!error) media_path = path;
+      } catch (e) {}
+    }
+    const { data, error } = await sb.from('posts').insert({ user_id: uid, type, payload: payload || {}, media_path }).select('id').single();
+    if (error) throw error;
+    return data.id;
+  };
+  const getFeed = async () => {
+    const { data } = await sb.from('posts')
+      .select('id,user_id,type,payload,media_path,created_at, author:profiles!posts_user_id_fkey(id,username,sr), likes(user_id)')
+      .order('created_at', { ascending:false }).limit(60);
+    const posts = data || [];
+    const paths = posts.filter(p => p.media_path).map(p => p.media_path);
+    const signed = {};
+    if (paths.length) {
+      try { const { data: urls } = await sb.storage.from('post-media').createSignedUrls(paths, 3600);
+        (urls || []).forEach(u => { if (u.path && u.signedUrl) signed[u.path] = u.signedUrl; }); } catch (e) {}
+    }
+    const uid = me();
+    return posts.map(p => ({
+      id: p.id, type: p.type, payload: p.payload || {}, created_at: p.created_at,
+      author: p.author, mine: p.user_id === uid, media_url: p.media_path ? signed[p.media_path] : null,
+      likeCount: (p.likes || []).length, liked: (p.likes || []).some(l => l.user_id === uid),
+    }));
+  };
+  const toggleLike = async (postId, on) => {
+    if (on) { const { error } = await sb.from('likes').insert({ post_id: postId, user_id: me() });
+      if (error && !String(error.message).includes('duplicate')) throw error; }
+    else await sb.from('likes').delete().eq('post_id', postId).eq('user_id', me());
+  };
+  const deletePost = async postId => { const { error } = await sb.from('posts').delete().eq('id', postId); if (error) throw error; };
+
+  // live nudges / friend requests / feed while the app is open
   let rtChannel = null, socialCb = () => {};
   const startRealtime = () => {
     if (!ready() || rtChannel) return;
     rtChannel = sb.channel('social')
       .on('postgres_changes', { event:'INSERT', schema:'public', table:'nudges', filter:'to_user=eq.'+me() }, p => socialCb({ type:'nudge', row:p.new }))
       .on('postgres_changes', { event:'*', schema:'public', table:'friendships' }, p => socialCb({ type:'friend', row:p.new || p.old }))
+      .on('postgres_changes', { event:'*', schema:'public', table:'posts' }, p => socialCb({ type:'post', row:p.new || p.old }))
+      .on('postgres_changes', { event:'*', schema:'public', table:'likes' }, p => socialCb({ type:'like', row:p.new || p.old }))
       .subscribe();
   };
 
@@ -194,6 +236,7 @@ window.cloud = (() => {
   return { init, ready, signUp, signIn, signOut, syncNow, pullAll, queueAllLocal, mark, pending,
     searchUsers, sendFriendRequest, respondFriend, listFriendships, sendNudge, listNudges, markNudgeSeen,
     getLeaderboard, startRealtime, onSocial: f => { socialCb = f; },
+    createPost, getFeed, toggleLike, deletePost,
     pushSupported, pushEnabled, enablePush, disablePush,
     user: () => user, configured: !!sb, onAuthChange: f => { onChange = f; } };
 })();

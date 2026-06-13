@@ -919,6 +919,21 @@ function countPRs(ses){
   }
   return n;
 }
+// The single most impressive PR in a session (by lift score), for the feed auto-post.
+function prHeadline(ses){
+  let best=null;
+  for(const ex of ses.exercises){
+    const top=Math.max(0,...ex.sets.map(s=>+s.weight||0)); if(!top) continue;
+    let prev=0;
+    for(const s2 of S.sessions){ if(s2===ses||s2.start>=ses.start) continue; const e2=s2.exercises.find(e=>e.id===ex.id); if(e2) for(const st of e2.sets) prev=Math.max(prev,+st.weight||0); }
+    if(prev>0 && top>prev){
+      const reps=Math.max(1,...ex.sets.filter(s=>+s.weight===top).map(s=>+s.reps||1));
+      const score=liftScore(ex.id, top);
+      if(!best||score>best.score) best={lift:EXMAP[ex.id].name, wt:top, reps, units:S.units, score};
+    }
+  }
+  return best;
+}
 function shardsForSession(ses, prCount){
   const mins=Math.min(120, Math.max(0, Math.round(((ses.end||Date.now())-ses.start)/60000)));
   const sets=ses.exercises.reduce((a,e)=>a+e.sets.length,0);
@@ -1399,11 +1414,18 @@ function commitFinish(){
   const shard=shardsForSession(a, prCount);
   S.shards=(S.shards||0)+shard.gain;
   const afterDet=rankDetail(overallSR()), xpAfter=totalXP(), lvlAfter=levelInfo(xpAfter).level;
-  if(finShare){ const capEl=document.getElementById('finCap'); const cap=(capEl?capEl.value:finCapText||'').trim();
+  const rankedUp=rankOrdinal(afterDet)>rankOrdinal(beforeDet);
+  const pr=prHeadline(a);
+  const cap=finShare?((document.getElementById('finCap')||{}).value || finCapText || '').trim():null;
+  const workoutPayload={title:guessSplit(a), sets:a.exercises.reduce((x,e)=>x+e.sets.length,0), vol:sessionVolume(a), act:activationForSession(a), units:S.units};
+  if(window.cloud && cloud.ready()){
+    // Cloud feed: explicit workout share + automatic achievement posts.
+    if(finShare){ cloud.createPost('post', {caption:cap, workout:workoutPayload}, finMedia).then(()=>refreshFeed()).catch(()=>{}); }
+    if(rankedUp){ cloud.createPost('rankup', {rank:afterDet.rank.name+(afterDet.division?' '+afterDet.division:''), sr:Math.round(overallSR())}).then(()=>refreshFeed()).catch(()=>{}); }
+    else if(pr){ cloud.createPost('pr', {lift:pr.lift, wt:pr.wt, reps:pr.reps, units:pr.units}).then(()=>refreshFeed()).catch(()=>{}); }
+  } else if(finShare){
     S.posts=S.posts||[];
-    S.posts.unshift({type:'post', caption:cap, media:finMedia,
-      workout:{title:guessSplit(a), sets:a.exercises.reduce((x,e)=>x+e.sets.length,0), vol:sessionVolume(a), act:activationForSession(a)},
-      when:'now', likes:0, comments:0, ts:Date.now()});
+    S.posts.unshift({type:'post', caption:cap, media:finMedia, workout:workoutPayload, when:'now', likes:0, comments:0, ts:Date.now()});
     if(S.posts.length>20) S.posts.length=20;
   }
   try{ save(); }catch(e){}
@@ -2304,25 +2326,45 @@ let celReturn='rank';
 function closeCelebrate(){ haptic(20); document.getElementById('celebrate').classList.remove('show'); go(celReturn); celReturn='rank'; }
 function previewAscension(){ const cur=rankDetail(overallSR()); const ni=Math.min(ASC,RANKS.indexOf(cur.rank)+1); celebrateRankUp(cur, rankDetail(ni*100+8)); }
 
-// ---------- Discovery / Social Feed ----------
-let feedScope='foryou', likeState={};
+// ---------- Discovery / Social Feed (cloud-backed) ----------
+let feedScope='foryou', feedCache=null, feedAt=0, feedLoading=false;
 function setFeedScope(el,s){ document.querySelectorAll('#feedScope .chip').forEach(c=>c.classList.remove('on')); el.classList.add('on'); feedScope=s; renderFeed(); }
 function guessSplit(ses){ const cnt={}; ses.exercises.forEach(e=>{const g=EXMAP[e.id].group; cnt[g]=(cnt[g]||0)+1;}); let best='Full Body',m=0; for(const g in cnt) if(cnt[g]>m){m=cnt[g];best=g;} return best+' Day'; }
-function feedPosts(){
-  // Local-only build: the feed holds your own posts only. Other people's posts
-  // arrive when ASCEND has real accounts (needs a backend).
-  return (S.posts||[]).map(p=>({...p, me:true, friend:true, user:S.name||'You', sr:overallSR(), id:'u'+p.ts}));
+function relTime(iso){ const s=Math.floor((Date.now()-new Date(iso).getTime())/1000);
+  if(s<60) return 'now'; if(s<3600) return Math.floor(s/60)+'m'; if(s<86400) return Math.floor(s/3600)+'h';
+  if(s<604800) return Math.floor(s/86400)+'d'; return Math.floor(s/604800)+'w'; }
+async function refreshFeed(){
+  if(!(window.cloud&&cloud.ready())||feedLoading) return;
+  feedLoading=true;
+  try{ feedCache=await cloud.getFeed(); feedAt=Date.now(); renderFeed(true); }catch(e){}
+  feedLoading=false;
+}
+// Normalise a cloud feed row into the shape the renderer uses.
+function normPost(p){
+  const a=p.payload||{};
+  return { id:p.id, type:p.type, mine:p.mine, user:p.mine?(S.name||'You'):(p.author&&p.author.username)||'?',
+    sr:p.mine?overallSR():((p.author&&p.author.sr)||0), when:relTime(p.created_at),
+    caption:a.caption, workout:a.workout, rank:a.rank, lift:a.lift, wt:a.wt, reps:a.reps, units:a.units||S.units,
+    media:p.media_url, likes:p.likeCount, liked:p.liked };
 }
 function workoutPostBlock(w){
-  const cf=actColorFn(w.act);
+  const cf=actColorFn(w.act); const u=w.units||S.units;
   return `<div style="background:var(--card2);border-radius:14px;padding:12px;margin-top:10px;">
-    <div class="row sb"><div style="font-weight:700;">🏋️ ${w.title}</div><div class="tiny muted">${w.sets} sets · ${fmt(w.vol)} ${S.units}</div></div>
+    <div class="row sb"><div style="font-weight:700;">${icon('barbell',16)} ${escapeHtml(w.title)}</div><div class="tiny muted">${w.sets} sets · ${fmt(w.vol)} ${u}</div></div>
     <div style="display:flex;justify-content:center;gap:8px;margin-top:8px;">${bodySVG('front',cf,94)}${bodySVG('back',cf,94)}</div>
     <div class="tiny muted" style="text-align:center;margin-top:4px;">Muscles trained · brighter = more volume</div>
   </div>`;
 }
-function renderFeed(){
-  const posts=feedPosts(); window._feed=posts;
+function renderFeed(fromRefresh){
+  const signedIn=window.cloud&&cloud.ready();
+  // Signed in → cloud feed; signed out → local posts only (offline fallback).
+  let posts;
+  if(signedIn&&feedCache) posts=feedCache.map(normPost);
+  else if(!signedIn) posts=(S.posts||[]).map(p=>({id:'u'+p.ts, type:p.type||'post', mine:true, user:S.name||'You', sr:overallSR(), when:p.when||'now', caption:p.caption, workout:p.workout, media:p.media, units:S.units, likes:p.likes||0, liked:false}));
+  else posts=[];
+  if(feedScope==='friends') posts=posts.filter(p=>!p.mine);
+  window._feed=posts;
+  if(!fromRefresh && signedIn && (!feedCache || Date.now()-feedAt>20000)) refreshFeed();
   const ini0=(S.name||'A').slice(0,1).toUpperCase();
   const nudgeBadge = socialCount() ? `<span style="background:var(--bad);color:#fff;border-radius:999px;font-size:11px;font-weight:800;padding:1px 7px;margin-left:6px;">${socialCount()}</span>` : '';
   let html=`<button class="btn ghost" onclick="openFriends()" style="margin-bottom:10px;">${icon('users',17)} Friends · challenge &amp; nudge${nudgeBadge}</button>
@@ -2331,34 +2373,44 @@ function renderFeed(){
       <div class="grow muted" style="font-size:14px;">Share your workout…</div>
       <span class="muted">${icon('camera',19)}</span></div>`;
   html += posts.map((p,i)=>{
-    const r=rankFor(p.sr), det=rankDetail(p.sr), initials=p.user.slice(0,2).toUpperCase();
+    const r=rankFor(p.sr), det=rankDetail(p.sr), initials=p.user.slice(0,2).toUpperCase(), u=p.units||S.units;
     let body='';
-    if(p.type==='rankup') body=`<div style="background:${r.color}14;border:1px solid ${r.color}44;border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;margin-top:10px;">${rankEmblem(r,40)}<div><div style="font-weight:800;color:${r.color};">Ranked up to ${p.rank}!</div><div class="tiny muted">A new tier unlocked</div></div></div>`;
-    else if(p.type==='pr') body=`<div style="margin-top:10px;"><div style="font-weight:700;"><span style="color:var(--warn);">${icon('trophy',16)}</span> New PR · ${p.lift}</div><div style="font-size:22px;font-weight:900;margin-top:2px;">${p.wt} ${S.units} × ${p.reps}</div><div class="tiny muted">Personal best</div></div>`;
-    else if(p.type==='post') body=(p.media?`<img src="${p.media}" style="width:100%;border-radius:14px;margin-top:10px;display:block;">`:'')
+    if(p.type==='rankup') body=`<div style="background:${r.color}14;border:1px solid ${r.color}44;border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;margin-top:10px;">${rankEmblem(r,40)}<div><div style="font-weight:800;color:${r.color};">Ranked up to ${escapeHtml(p.rank||r.name)}!</div><div class="tiny muted">A new tier unlocked</div></div></div>`;
+    else if(p.type==='pr') body=`<div style="margin-top:10px;"><div style="font-weight:700;"><span style="color:var(--warn);">${icon('trophy',16)}</span> New PR · ${escapeHtml(p.lift||'')}</div><div style="font-size:22px;font-weight:900;margin-top:2px;">${p.wt} ${u} × ${p.reps}</div><div class="tiny muted">Personal best</div></div>`;
+    else body=(p.media?`<img src="${p.media}" style="width:100%;border-radius:14px;margin-top:10px;display:block;">`:'')
         +(p.caption?`<div style="margin-top:10px;">${escapeHtml(p.caption)}</div>`:'')
         +(p.workout?workoutPostBlock(p.workout):'');
-    else body=`<div style="margin-top:10px;"><div style="font-weight:700;">Finished ${p.title}</div><div class="tiny muted" style="margin-top:2px;">${p.sets} sets · ${fmt(p.vol)} ${S.units} volume</div></div>`;
-    const cap=(p.type!=='post'&&p.cap)?`<div class="tiny" style="margin-top:8px;color:var(--txt);">${p.cap}</div>`:'';
-    const liked=likeState[p.id], likes=(p.likes||0)+(liked?1:0);
+    const liked=p.liked;
     return `<div class="card">
       <div class="row" style="gap:10px;">
         <div class="avatar" style="background:${r.color};">${initials}</div>
-        <div class="grow"><div style="font-weight:700;">${p.user} ${p.me?'<span class="tiny" style="color:var(--accent2)">· you</span>':''}</div>
+        <div class="grow"><div style="font-weight:700;">${escapeHtml(p.user)} ${p.mine?'<span class="tiny" style="color:var(--accent2)">· you</span>':''}</div>
           <div class="tiny" style="color:${r.color};font-weight:600;display:flex;align-items:center;gap:4px;">${rankEmblem(r,13)} ${r.name}${det.division?' '+det.division:''}</div></div>
         <div class="tiny muted">${p.when}</div>
+        ${p.mine&&typeof p.id==='number'?`<button class="portbtn" style="padding:4px 8px;margin-left:4px;color:var(--bad);" onclick="deleteFeedPost(${p.id})">✕</button>`:''}
       </div>
-      ${body}${cap}
+      ${body}
       <div class="feedact">
-        <button class="${liked?'liked':''}" onclick="toggleLike(${i})">${liked?'<span style="color:#ff4d6a;">'+icon('heart',15)+'</span>':icon('heartO',15)} ${likes}</button>
-        <button>${icon('chat',15)} ${p.comments}</button>
-        <button style="margin-left:auto;">↗︎ Share</button>
+        <button class="${liked?'liked':''}" onclick="toggleLike(${i})">${liked?'<span style="color:#ff4d6a;">'+icon('heart',15)+'</span>':icon('heartO',15)} ${p.likes||0}</button>
       </div></div>`;
   }).join('');
-  if(!posts.length) html+=emptyState('sparkle','Your feed is empty','Finish a workout and share it — your posts, PRs and rank-ups will show up here.');
+  if(!posts.length) html+=emptyState('sparkle', feedScope==='friends'?'No posts from friends yet':'Your feed is empty',
+    feedScope==='friends'?'When your friends share workouts, PRs and rank-ups, they land here.':'Finish a workout and share it — your posts, PRs and rank-ups will show up here.');
   document.getElementById('feedBody').innerHTML=html;
 }
-function toggleLike(i){ const p=window._feed[i]; likeState[p.id]=!likeState[p.id]; haptic(likeState[p.id]?[0,15,30,15]:10); renderFeed(); }
+async function toggleLike(i){
+  const p=window._feed[i]; if(!p||typeof p.id!=='number') return;
+  const on=!p.liked; p.liked=on; p.likes=(p.likes||0)+(on?1:-1); haptic(on?[0,15,30,15]:10);
+  // update cache + re-render optimistically
+  if(feedCache){ const c=feedCache.find(x=>x.id===p.id); if(c){ c.liked=on; c.likeCount=p.likes; } }
+  renderFeed(true);
+  try{ await cloud.toggleLike(p.id, on); }catch(e){ /* will reconcile on next refresh */ }
+}
+async function deleteFeedPost(id){
+  if(!confirm('Delete this post?')) return;
+  try{ await cloud.deletePost(id); if(feedCache) feedCache=feedCache.filter(p=>p.id!==id); renderFeed(true); toast('Post deleted'); }
+  catch(e){ toast('Could not delete the post'); }
+}
 
 // ----- Compose a post (caption + photo + today's workout bodygraph) -----
 let composeMedia=null, composeWorkout=false;
@@ -2386,11 +2438,18 @@ function renderComposePreview(){
   }
   document.getElementById('composePreview').innerHTML=h;
 }
-function submitPost(){
+async function submitPost(){
   const cap=document.getElementById('composeCap').value.trim();
   if(!cap && !composeMedia && !composeWorkout){ toast('Add a caption, photo, or workout'); return; }
   let workout=null; const ses=S.sessions[S.sessions.length-1];
-  if(composeWorkout && ses) workout={title:guessSplit(ses), sets:ses.exercises.reduce((a,e)=>a+e.sets.length,0), vol:sessionVolume(ses), act:activationForSession(ses)};
+  if(composeWorkout && ses) workout={title:guessSplit(ses), sets:ses.exercises.reduce((a,e)=>a+e.sets.length,0), vol:sessionVolume(ses), act:activationForSession(ses), units:S.units};
+  if(window.cloud && cloud.ready()){
+    closeModal('composeModal'); haptic([0,25,40,25]); toast('Posting…');
+    try{ await cloud.createPost('post', {caption:cap, workout}, composeMedia); await refreshFeed(); toast('Posted to feed'); }
+    catch(e){ toast('Could not post — check your connection'); }
+    return;
+  }
+  // signed-out fallback: keep it local
   S.posts=S.posts||[]; S.posts.unshift({type:'post', caption:cap, media:composeMedia, workout, when:'now', likes:0, comments:0, ts:Date.now()});
   if(S.posts.length>20) S.posts.length=20;
   try{ save(); }catch(e){ toast('Posted (photo too large to save offline)'); }
@@ -3160,9 +3219,9 @@ window.S = S;
 if(window.cloud && cloud.configured) cloud.init().then(u=>{
   if(!u) return;
   cloud.onSocial(ev=>{
-    if(ev.type==='nudge'){ haptic([0,20,30,20]); toast('👋 A friend nudged you — check Friends'); }
-    else if(ev.type==='friend' && ev.row && ev.row.status==='pending' && ev.row.requested_by!==cloud.user().id){ haptic([0,20]); toast('New friend request 👥'); }
-    refreshSocial();
+    if(ev.type==='nudge'){ haptic([0,20,30,20]); toast('👋 A friend nudged you — check Friends'); refreshSocial(); }
+    else if(ev.type==='friend'){ if(ev.row && ev.row.status==='pending' && ev.row.requested_by!==cloud.user().id){ haptic([0,20]); toast('New friend request 👥'); } refreshSocial(); }
+    else if(ev.type==='post'||ev.type==='like'){ if(document.getElementById('screen-feed').classList.contains('active')) refreshFeed(); }
   });
   cloud.pullAll().then(()=>{ localStorage.setItem('ascend', JSON.stringify(S)); applyTheme();
     const cur=document.querySelector('.screen.active'); go(cur?cur.id.replace('screen-',''):'train');
