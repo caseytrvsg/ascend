@@ -690,15 +690,15 @@ function exDemoPhoto(id){
 
 // ---------- Rank ladder ----------
 const RANKS = [
-  {name:'Wood',          color:'#8a5a2b'},
-  {name:'Iron',          color:'#5d5d68'},
-  {name:'Silver',        color:'#c5cdd6'},
-  {name:'Gold',          color:'#ffc23a'},
-  {name:'Platinum',      color:'#45d6c0'},
-  {name:'Titanium',      color:'#6f8fb0'},
-  {name:'Champion',      color:'#b06bff'},
-  {name:'Grandchampion', color:'#ff3b6b'},
-  {name:'Ascended',      color:'#fff0a8'},
+  {name:'Paperweight',       color:'#8a5a2b'},
+  {name:'Featherweight',     color:'#5d5d68'},
+  {name:'Lightweight',       color:'#c5cdd6'},
+  {name:'Welterweight',      color:'#ffc23a'},
+  {name:'Middleweight',      color:'#45d6c0'},
+  {name:'Heavyweight',       color:'#6f8fb0'},
+  {name:'Super Heavyweight', color:'#b06bff'},
+  {name:'Olympian',          color:'#ff3b6b'},
+  {name:'Ascended',          color:'#fff0a8'},
 ];
 RANKS.forEach((r,i)=>r.min=i*100);      // each rank spans 100 SR
 const SR_PER_RANK=100, ASC=RANKS.length-1;
