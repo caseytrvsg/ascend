@@ -302,7 +302,7 @@
   @keyframes bcmove{0%{top:14%;}50%{top:86%;}100%{top:14%;}}
   /* perspective rank ladder */
   .ladderWrap{position:relative; margin:0 -16px; overflow:hidden;}
-  .ladderBeam{position:absolute; top:0; bottom:0; left:50%; transform:translateX(-50%); width:74%; clip-path:polygon(44% 0,56% 0,100% 100%,0 100%); pointer-events:none; z-index:0;}
+  .ladderBeam{position:absolute; top:0; bottom:0; left:50%; transform:translateX(-50%); width:74%; clip-path:polygon(44% 0,56% 0,100% 100%,0 100%); pointer-events:none; z-index:0; filter:blur(9px);}
   .rung{position:relative; z-index:1; min-height:112px; padding:10px 16px;}
   .rung .emb{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:flex; align-items:center; justify-content:center;}
   .rung .rn{position:absolute; left:14px; top:50%; transform:translateY(-50%); max-width:33%; font-weight:900; font-size:13px; letter-spacing:.2px; text-transform:uppercase; line-height:1.15;}
@@ -1858,7 +1858,8 @@ function renderLadder(containerId, scp, autoScroll){
       <div class="lright">${isMe?'<span class="tiny" style="color:var(--accent2);font-weight:900;letter-spacing:.5px;">YOU</span>':''}${av}</div>
     </div>`;
   }).join('');
-  el.innerHTML=`<div class="ladderWrap"><div class="ladderBeam" style="background:linear-gradient(0deg,transparent,${myDet.rank.color}1f 45%,${myDet.rank.color}38);"></div>${body}</div>`;
+  const bc=myDet.rank.color;   // climber's own rank colour — NOT Ascended's
+  el.innerHTML=`<div class="ladderWrap"><div class="ladderBeam" style="background:linear-gradient(180deg, transparent 0%, ${bc}30 3%, ${bc}22 12%, ${bc}15 38%, ${bc}0a 72%, transparent 100%);"></div>${body}</div>`;
   if(autoScroll) setTimeout(()=>{ const m=document.getElementById('myRung'); if(m) m.scrollIntoView({block:'center',behavior:'auto'}); },70);
 }
 let fromRefreshGuard=false;
@@ -2205,7 +2206,7 @@ function renderSettings(){
       <div class="setsec">Legal</div>
       ${setRow(icon('doc',18),'Privacy policy',{onclick:'comingSoon()'})}
       ${setRow(icon('doc',18),'Terms of use',{onclick:'comingSoon()'})}
-      <div class="tiny muted" style="text-align:center;margin-top:22px;">ASCEND prototype · v0.14 · ${window.cloud&&cloud.ready()?'synced to your account':'data stored on this device'}</div>
+      <div class="tiny muted" style="text-align:center;margin-top:22px;">ASCEND prototype · v0.15 · ${window.cloud&&cloud.ready()?'synced to your account':'data stored on this device'}</div>
     </div>`;
 }
 // ---------- Account sheet (for users who skipped the onboarding account step) ----------
