@@ -305,7 +305,7 @@
   .ladderBeam{position:absolute; top:0; bottom:0; left:50%; transform:translateX(-50%); width:74%; clip-path:polygon(44% 0,56% 0,100% 100%,0 100%); pointer-events:none; z-index:0;}
   .rung{position:relative; z-index:1; min-height:112px; padding:10px 16px;}
   .rung .emb{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:flex; align-items:center; justify-content:center;}
-  .rung .rn{position:absolute; left:16px; top:50%; transform:translateY(-50%); max-width:36%; font-weight:900; font-size:17px; letter-spacing:.3px; text-transform:uppercase; line-height:1.12;}
+  .rung .rn{position:absolute; left:14px; top:50%; transform:translateY(-50%); max-width:33%; font-weight:900; font-size:13px; letter-spacing:.2px; text-transform:uppercase; line-height:1.15;}
   .rung.me{background:linear-gradient(90deg,transparent, color-mix(in srgb, var(--accent) 26%, transparent), transparent);}
   .rung.me::before,.rung.me::after{content:''; position:absolute; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,var(--accent),transparent);}
   .rung.me::before{top:0;} .rung.me::after{bottom:0;}
@@ -1849,7 +1849,7 @@ function renderLadder(containerId, scp, autoScroll){
       + (here.length>3?`<span class="tiny muted">+${here.length-3}</span>`:'');
     return `<div class="rung ${isMe?'me':'ladderDim'}" ${isMe?'id="myRung"':''}>
       <div class="rn" style="color:${rk.color};">${rk.name}<span style="opacity:.65;"> ${divRoman(rg.d)}</span></div>
-      <div class="emb">${rankEmblem(rk, isMe?92:78, rg.d)}</div>
+      <div class="emb">${rankEmblem(rk, isMe?84:74, rg.d)}</div>
       <div class="lright">${isMe?'<span class="tiny" style="color:var(--accent2);font-weight:900;letter-spacing:.5px;">YOU</span>':''}${av}</div>
     </div>`;
   }).join('');
@@ -2200,7 +2200,7 @@ function renderSettings(){
       <div class="setsec">Legal</div>
       ${setRow(icon('doc',18),'Privacy policy',{onclick:'comingSoon()'})}
       ${setRow(icon('doc',18),'Terms of use',{onclick:'comingSoon()'})}
-      <div class="tiny muted" style="text-align:center;margin-top:22px;">ASCEND prototype · v0.9 · ${window.cloud&&cloud.ready()?'synced to your account':'data stored on this device'}</div>
+      <div class="tiny muted" style="text-align:center;margin-top:22px;">ASCEND prototype · v0.10 · ${window.cloud&&cloud.ready()?'synced to your account':'data stored on this device'}</div>
     </div>`;
 }
 // ---------- Account sheet (for users who skipped the onboarding account step) ----------
