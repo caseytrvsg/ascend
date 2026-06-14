@@ -302,7 +302,7 @@
   @keyframes bcmove{0%{top:14%;}50%{top:86%;}100%{top:14%;}}
   /* perspective rank ladder */
   .ladderWrap{position:relative; margin:0 -16px; overflow:hidden;}
-  .ladderBeam{position:absolute; top:0; bottom:0; left:50%; transform:translateX(-50%); width:74%; clip-path:polygon(44% 0,56% 0,100% 100%,0 100%); pointer-events:none; z-index:0;}
+  .ladderBeam{position:absolute; top:0; bottom:0; left:50%; transform:translateX(-50%); width:74%; clip-path:polygon(44% 0,56% 0,100% 100%,0 100%); pointer-events:none; z-index:0; filter:blur(6px);}
   .rung{position:relative; z-index:1; min-height:112px; padding:10px 16px;}
   .rung .emb{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:flex; align-items:center; justify-content:center;}
   .rung .rn{position:absolute; left:14px; top:50%; transform:translateY(-50%); max-width:33%; font-weight:900; font-size:13px; letter-spacing:.2px; text-transform:uppercase; line-height:1.15;}
@@ -874,8 +874,14 @@ function medalSVG(place, sz){
 // ---------- State ----------
 let S = load();
 function load(){ try{ const d=JSON.parse(localStorage.getItem('ascend')); return d? Object.assign(fresh(),d) : fresh(); }catch(e){ return fresh(); } }
+// Starter split everyone begins with — a classic Push / Pull / Legs to guide new lifters.
+function defaultRoutines(){ return [
+  {rid:1, name:'Push Day', items:[{id:'bench',sets:4},{id:'ohp',sets:3},{id:'inclineDb',sets:3},{id:'pushdown',sets:3}]},
+  {rid:2, name:'Pull Day', items:[{id:'dead',sets:3},{id:'rowBb',sets:4},{id:'latpull',sets:3},{id:'curlBb',sets:3}]},
+  {rid:3, name:'Leg Day',  items:[{id:'squat',sets:4},{id:'rdl',sets:3},{id:'legpress',sets:3},{id:'legcurl',sets:3},{id:'calf',sets:3}]},
+]; }
 function fresh(){ return { name:'Athlete', bw:180, units:'lb', heightCm:null, heightUnit:'cm', age:null, activity:'moderate', bodyFat:null, goal:null, calories:null,
-  sessions:[], active:null, routines:[], comp:{tier:0, div:0, sr:0, wins:0, losses:0, streak:0}, posts:[], meals:[], pro:false,
+  sessions:[], active:null, routines:defaultRoutines(), comp:{tier:0, div:0, sr:0, wins:0, losses:0, streak:0}, posts:[], meals:[], pro:false,
   shards:120, owned:['th_mid','bd_none','bn_none'], inv:{}, boost:null, theme:'th_mid', border:'bd_none', banner:'bn_none', deals:null, onboarded:false }; }
   // NOTE: streak state (S.stk / S.stkLost) is intentionally NOT in fresh() — undefined triggers deriveStreak() migration from session history.
 function save(){
@@ -1331,11 +1337,10 @@ function renderRoutines(){
   if(!S.routines.length){ el.innerHTML=emptyState('clipboard','No routines yet','Build one with ＋ New, or let Generate plan your day.'); return; }
   el.innerHTML=S.routines.map((rt,ri)=>{
     const sets=rt.items.reduce((a,i)=>a+i.sets,0);
-    const icons=rt.items.slice(0,5).map(i=>EXMAP[i.id].icon).join(' ');
     return `<div class="card flat" style="padding:13px 15px;">
       <div class="row sb">
         <div class="grow"><div style="font-weight:700;">${rt.name}</div>
-          <div class="tiny muted">${rt.items.length} lifts · ${sets} sets · ${icons}</div></div>
+          <div class="tiny muted">${rt.items.length} lifts · ${sets} sets</div></div>
         <button class="btn sm" style="padding:8px 14px;" onclick="startRoutine(${ri})">Start</button>
         <button class="btn danger sm" style="padding:8px 10px;" onclick="delRoutine(${ri})">🗑</button>
       </div></div>`;
@@ -1853,7 +1858,8 @@ function renderLadder(containerId, scp, autoScroll){
       <div class="lright">${isMe?'<span class="tiny" style="color:var(--accent2);font-weight:900;letter-spacing:.5px;">YOU</span>':''}${av}</div>
     </div>`;
   }).join('');
-  el.innerHTML=`<div class="ladderWrap"><div class="ladderBeam" style="background:radial-gradient(150% 9% at 50% 0%, ${myDet.rank.color}73, transparent 70%), linear-gradient(180deg, ${myDet.rank.color}4d 0%, ${myDet.rank.color}29 42%, ${myDet.rank.color}29 100%);"></div>${body}</div>`;
+  const beamC=RANKS[ASC].color;   // the light IS Ascended — warm gold from the summit, not the climber's rank colour
+  el.innerHTML=`<div class="ladderWrap"><div class="ladderBeam" style="background:linear-gradient(180deg, transparent 0%, ${beamC}5e 3%, ${beamC}2b 10%, ${beamC}0c 18%, transparent 28%);"></div>${body}</div>`;
   if(autoScroll) setTimeout(()=>{ const m=document.getElementById('myRung'); if(m) m.scrollIntoView({block:'center',behavior:'auto'}); },70);
 }
 let fromRefreshGuard=false;
@@ -2200,7 +2206,7 @@ function renderSettings(){
       <div class="setsec">Legal</div>
       ${setRow(icon('doc',18),'Privacy policy',{onclick:'comingSoon()'})}
       ${setRow(icon('doc',18),'Terms of use',{onclick:'comingSoon()'})}
-      <div class="tiny muted" style="text-align:center;margin-top:22px;">ASCEND prototype · v0.11 · ${window.cloud&&cloud.ready()?'synced to your account':'data stored on this device'}</div>
+      <div class="tiny muted" style="text-align:center;margin-top:22px;">ASCEND prototype · v0.12 · ${window.cloud&&cloud.ready()?'synced to your account':'data stored on this device'}</div>
     </div>`;
 }
 // ---------- Account sheet (for users who skipped the onboarding account step) ----------
