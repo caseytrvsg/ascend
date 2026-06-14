@@ -1853,7 +1853,7 @@ function renderLadder(containerId, scp, autoScroll){
       <div class="lright">${isMe?'<span class="tiny" style="color:var(--accent2);font-weight:900;letter-spacing:.5px;">YOU</span>':''}${av}</div>
     </div>`;
   }).join('');
-  el.innerHTML=`<div class="ladderWrap"><div class="ladderBeam" style="background:linear-gradient(180deg,transparent,${myDet.rank.color}1f 45%,${myDet.rank.color}38);"></div>${body}</div>`;
+  el.innerHTML=`<div class="ladderWrap"><div class="ladderBeam" style="background:radial-gradient(150% 9% at 50% 0%, ${myDet.rank.color}73, transparent 70%), linear-gradient(180deg, ${myDet.rank.color}4d 0%, ${myDet.rank.color}29 42%, ${myDet.rank.color}29 100%);"></div>${body}</div>`;
   if(autoScroll) setTimeout(()=>{ const m=document.getElementById('myRung'); if(m) m.scrollIntoView({block:'center',behavior:'auto'}); },70);
 }
 let fromRefreshGuard=false;
@@ -2200,7 +2200,7 @@ function renderSettings(){
       <div class="setsec">Legal</div>
       ${setRow(icon('doc',18),'Privacy policy',{onclick:'comingSoon()'})}
       ${setRow(icon('doc',18),'Terms of use',{onclick:'comingSoon()'})}
-      <div class="tiny muted" style="text-align:center;margin-top:22px;">ASCEND prototype · v0.10 · ${window.cloud&&cloud.ready()?'synced to your account':'data stored on this device'}</div>
+      <div class="tiny muted" style="text-align:center;margin-top:22px;">ASCEND prototype · v0.11 · ${window.cloud&&cloud.ready()?'synced to your account':'data stored on this device'}</div>
     </div>`;
 }
 // ---------- Account sheet (for users who skipped the onboarding account step) ----------
