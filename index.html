@@ -3129,6 +3129,26 @@ function snapMeal(){
   scanItems=[]; scanView='results'; haptic([0,25,40,25]); renderScanSheet();
 }
 function pickScanPhoto(input){ readImage(input,u=>{ Scanner.stop(); scanPhoto=u; scanItems=[]; scanView='results'; haptic([0,25,40,25]); renderScanSheet(); }); }
+// AI meal recognition — the server (scan-meal fn) enforces the daily cap; this just reflects it.
+async function aiIdentifyMeal(){
+  if(!(window.cloud && cloud.ready())){ toast('Sign in to use AI recognition'); return; }
+  const btn=document.getElementById('aiIdBtn'); if(btn){ btn.disabled=true; btn.textContent='✨ Identifying…'; }
+  const res=await cloud.aiScanMeal(scanPhoto);
+  const reset=t=>{ if(btn){ btn.disabled=false; btn.textContent=t; } };
+  if(res && res.ok){
+    (res.foods||[]).forEach(f=>scanItems.push({food:{name:f.name,emoji:f.emoji||'🍽️',serving:f.serving||'1 serving',
+      kcal:f.kcal||0,p:f.p||0,c:f.c||0,f:f.f||0}, mult:1, conf:Math.round(f.confidence||90)}));
+    renderScanSheet();
+    toast((res.foods||[]).length?`AI added ${res.foods.length} item${res.foods.length>1?'s':''} — check & correct`:'AI couldn’t read the plate — add foods manually');
+    return;
+  }
+  const reason=res&&res.reason;
+  if(reason==='ai_user_limit'){ if(btn){ btn.textContent='✨ Daily AI limit reached'; } toast('Daily AI limit reached — add foods manually'); }   // hard stop: stays disabled
+  else if(reason==='ai_global_limit'){ if(btn){ btn.textContent='✨ AI unavailable today'; } toast('AI is at capacity today — try again tomorrow'); }
+  else if(reason==='ai-not-configured'){ reset('✨ Identify foods with AI'); toast('AI food recognition is coming soon'); }
+  else if(reason==='signed-out'){ reset('✨ Identify foods with AI'); toast('Sign in to use AI recognition'); }
+  else { reset('✨ Identify foods with AI'); toast('AI unavailable right now'); }
+}
 function scanTotals(){ const t={kcal:0,p:0,c:0,f:0}; scanItems.forEach(it=>{t.kcal+=it.food.kcal*it.mult;t.p+=it.food.p*it.mult;t.c+=it.food.c*it.mult;t.f+=it.food.f*it.mult;}); return t; }
 function cyclePortion(i){ const o=[0.5,1,1.5,2]; scanItems[i].mult=o[(o.indexOf(scanItems[i].mult)+1)%o.length]; renderScanSheet(); }
 function removeScanItem(i){ scanItems.splice(i,1); renderScanSheet(); }
@@ -3255,7 +3275,8 @@ function renderScanSheet(){
   const t=scanTotals();
   el.innerHTML=`<div class="grab"></div>
     <div class="row sb" style="margin-bottom:8px;"><h2 style="margin:0;">Your meal</h2>${scanPhoto?`<img src="${scanPhoto}" style="width:46px;height:46px;border-radius:10px;object-fit:cover;">`:''}</div>
-    <div class="tiny muted" style="margin-bottom:12px;">${scanItems.length?'Tap ✎ to correct a food, or ×N to adjust the portion.':'Add each food on the plate — AI recognition is coming in a future update.'}</div>
+    <div class="tiny muted" style="margin-bottom:12px;">${scanItems.length?'Tap ✎ to correct a food, or ×N to adjust the portion.':'Add each food on the plate, or let AI read it.'}</div>
+    ${scanPhoto && window.cloud && cloud.ready() ? `<button class="btn ghost sm" id="aiIdBtn" style="margin:0 0 12px;" onclick="aiIdentifyMeal()">✨ Identify foods with AI</button>` : ''}
     ${scanItems.map((it,i)=>{ const m=it.food;
       return `<div class="fooditem">
         <div style="font-size:25px;">${m.emoji}</div>

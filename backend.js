@@ -268,6 +268,25 @@ window.cloud = (() => {
     return data;
   };
 
+  // ---- AI meal recognition (server-capped; see scan-meal function)
+  const aiRemaining = async () => {
+    if (!ready()) return null;
+    try { const { data } = await sb.rpc('ai_remaining', { p_kind: 'scan_meal', p_user_max: 25 }); return data; }
+    catch (e) { return null; }
+  };
+  const aiScanMeal = async (imageDataUrl) => {
+    if (!ready()) return { ok: false, reason: 'signed-out' };
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      const r = await fetch(window.ASCEND_SUPABASE_URL + '/functions/v1/scan-meal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': window.ASCEND_SUPABASE_KEY },
+        body: JSON.stringify({ image: imageDataUrl }),
+      });
+      return await r.json().catch(() => ({ ok: false, reason: 'error' }));
+    } catch (e) { return { ok: false, reason: 'offline' }; }
+  };
+
   // live nudges / friend requests / feed / duels / messages while the app is open
   let rtChannel = null, socialCb = () => {};
   const startRealtime = () => {
@@ -297,7 +316,7 @@ window.cloud = (() => {
     getLeaderboard, startRealtime, onSocial: f => { socialCb = f; },
     createPost, getFeed, toggleLike, deletePost,
     challengeDuel, listDuels, respondDuel, submitDuel, signedProof,
-    getMessages, sendMessage,
+    getMessages, sendMessage, aiScanMeal, aiRemaining,
     pushSupported, pushEnabled, enablePush, disablePush,
     user: () => user, configured: !!sb, onAuthChange: f => { onChange = f; } };
 })();

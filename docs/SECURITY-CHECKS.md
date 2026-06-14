@@ -120,6 +120,30 @@ function block. To reset someone mid-test: `delete from public.rate_limits where
 
 ---
 
+## 5b. AI usage caps (so AI features stop at a hard limit)
+
+`migrations/0008_ai_quota.sql` + the `scan-meal` edge function cap the only cost-bearing
+feature (AI meal recognition). Two ceilings, enforced **server-side** where they can't be
+bypassed: **per-user 25/day** and **GLOBAL 2000/day** (your total spend limit). Hit either and
+the function returns `429` and never calls the paid model — the in-app button switches to
+"Daily AI limit reached" / "AI unavailable today". Math-only AI (calorie/macro plan) and barcode
+lookup (free OpenFoodFacts) are unaffected.
+
+Apply `0008…` (SQL Editor), then `supabase functions deploy scan-meal`. Until you set the
+provider key the feature is dormant and spends nothing:
+
+```
+supabase secrets set AI_API_KEY=<your vision-model key>
+```
+
+Tune the caps to your budget: edit `USER_DAILY` / `GLOBAL_DAILY` at the top of
+`supabase/functions/scan-meal/index.ts` and redeploy. Wire the real model where the
+`// TODO: call your vision model` comment is — the cap already wraps it.
+
+Watch usage: **Table Editor → `ai_usage`** (`scope='GLOBAL'` is the whole-app daily total;
+a uuid scope is one user). Counts settle exactly at the cap — a blocked call rolls back, so
+it's never counted or charged.
+
 ## 6. Known, intentional gaps (decide when you monetize)
 
 - **Shards / owned / inv are still client-trusted.** A determined user can give themselves

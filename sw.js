@@ -2,7 +2,7 @@
 // so edits show up on a plain reload; big static bundles are cache-first for
 // speed. Everything is cached either way, so the app still opens fully offline.
 // Bump VERSION whenever anatomy.js / exercise-images.js / vendor files / icons change.
-const VERSION = 'ascend-v15';
+const VERSION = 'ascend-v16';
 const DEV = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 const CORE = ['./', 'index.html', 'anatomy.js', 'exercise-images.js', 'vendor/supabase-js.js', 'vendor/zxing.js', 'config.js', 'sync-core.js', 'scanner.js', 'backend.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 const FRESH = ['config.js', 'sync-core.js', 'scanner.js', 'backend.js'];   // network-first app code
