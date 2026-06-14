@@ -17,6 +17,24 @@ test('profileToRow / profileFromRow roundtrip the fields that matter', () => {
   assert.equal(back.bw, 185); assert.equal(back.name, 'Casey'); assert.equal(back.profileUpdatedAt, 500);
 });
 
+test('client never writes server-authoritative entitlement columns', () => {
+  const S = { pro:true, comp:{ tier:9 }, shards:99999, bw:185 };
+  const row = C.profileToRow(S, 1);
+  assert.equal('pro' in row, false);        // subscription is server-only (grant-pro)
+  assert.equal('pro_until' in row, false);
+  assert.equal('comp' in row, false);       // competitive rank is server-only (resolve-duel)
+  assert.equal(row.shards, 99999);          // economy still client-synced (documented)
+});
+
+test('proActive honors server flag + expiry, ignores client wishes', () => {
+  const future = new Date(Date.now() + 86400000).toISOString();
+  const past   = new Date(Date.now() - 86400000).toISOString();
+  assert.equal(C.profileFromRow({ pro:true,  pro_until:null   }).pro, true);
+  assert.equal(C.profileFromRow({ pro:true,  pro_until:future }).pro, true);
+  assert.equal(C.profileFromRow({ pro:true,  pro_until:past   }).pro, false);  // expired
+  assert.equal(C.profileFromRow({ pro:false, pro_until:null   }).pro, false);  // not granted
+});
+
 test('mergeProfile: newer side wins', () => {
   const local = { bw:185, profileUpdatedAt: 200 };
   const cloudNewer = { bw:190, profileUpdatedAt: 300 };
