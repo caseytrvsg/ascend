@@ -366,7 +366,7 @@
       <div class="chiprow" style="margin-bottom:8px;">
         <div class="chip on" id="subRank" onclick="setRankSub('rank')"><span data-icon="shield" data-sz="15"></span> Rank</div>
         <div class="chip" id="subBody" onclick="setRankSub('body')"><span data-icon="heart" data-sz="15"></span> Bodygraph</div>
-        <div class="chip" id="subLeagues" onclick="setRankSub('leagues')"><span data-icon="trophy" data-sz="15"></span> Leagues</div>
+        <div class="chip" id="subLeagues" onclick="setRankSub('leagues')"><span data-icon="trophy" data-sz="15"></span> Leaderboard</div>
       </div>
     </div>
     <div id="rankOverview"></div>
@@ -1622,7 +1622,7 @@ function renderRank(){
   document.getElementById('rankOverview').style.display = rankSub==='rank'?'block':'none';
   document.getElementById('rankBodygraph').style.display = rankSub==='body'?'block':'none';
   document.getElementById('rankLeagues').style.display = rankSub==='leagues'?'block':'none';
-  if(rankSub==='rank') renderOverview(); else if(rankSub==='body') renderBodygraph(); else renderLadder();
+  if(rankSub==='rank') renderOverview(); else if(rankSub==='body') renderBodygraph(); else renderBoard();
 }
 function renderOverview(){
   const sr=overallSR(), det=rankDetail(sr), r=det.rank, nx=nextRank(sr);
@@ -1660,15 +1660,9 @@ function renderOverview(){
       <div class="stat"><div class="v">${Object.keys(best).length}</div><div class="l">Lifts Ranked</div></div>
     </div>
 
-    <h2>The ladder</h2>
-    <div class="card">${RANKS.slice().reverse().map(rk=>{
-      const cur=rk.name===r.name;
-      return `<div class="lift" style="${cur?'background:'+rk.color+'14;border-radius:12px;padding-left:8px;padding-right:8px;':''}">
-        <div class="liftmark" style="background:transparent;">${rankEmblem(rk,32)}</div>
-        <div class="grow"><div style="font-weight:700;color:${cur?rk.color:'var(--txt)'}">${rk.name}${cur?' · you':''}</div>
-          <div class="tiny muted">${rk.min}+ SR</div></div>
-        ${cur?`<div class="pill" style="color:${rk.color};border-color:${rk.color}55;">HERE</div>`:''}</div>`;
-    }).join('')}</div>`;
+    <h2>Your climb</h2>
+    <div id="rankLadder"></div>`;
+  renderLadder('rankLadder', 'friends', false);
 }
 function rankChart(){
   // SR after each session chronologically
@@ -1796,11 +1790,14 @@ function toggleGroup(g){ openGroups[g]=!openGroups[g]; renderBodygraph(); }
 // ---------- LEADERBOARD (cloud-backed) ----------
 // Global = every ASCEND account ordered by cached SR; Friends = accepted friends + you.
 let scope='global', lbCache=null, lbAt=0, lbLoading=false;
-function setScope(el,s){ document.querySelectorAll('#boardScope .chip').forEach(c=>c.classList.remove('on')); el.classList.add('on'); scope=s; renderLadder(); }
+function setScope(el,s){ document.querySelectorAll('#boardScope .chip').forEach(c=>c.classList.remove('on')); el.classList.add('on'); scope=s; renderBoard(); }
 async function refreshBoard(){
   if(!(window.cloud&&cloud.ready())||lbLoading) return;
   lbLoading=true;
-  try{ lbCache=await cloud.getLeaderboard(); lbAt=Date.now(); fromRefreshGuard=true; if(rankSub==='leagues') renderLadder(); else renderBoard(true); fromRefreshGuard=false; }catch(e){}
+  try{ lbCache=await cloud.getLeaderboard(); lbAt=Date.now(); fromRefreshGuard=true;
+    if(rankSub==='rank') renderLadder('rankLadder','friends',false);
+    else if(rankSub==='leagues') renderBoard(true);
+    fromRefreshGuard=false; }catch(e){}
   lbLoading=false;
 }
 function renderBoard(fromRefresh){
@@ -1831,12 +1828,14 @@ function renderBoard(fromRefresh){
 }
 // Perspective rank ladder — every tier/division stacked, your spot lit up, friends placed where they sit.
 function divRoman(d){ return d?(['','I','II','III'][d]||''):''; }
-function renderLadder(){
+function renderLadder(containerId, scp, autoScroll){
+  containerId = containerId || 'rankLadder'; scp = scp || 'friends';
+  const el = document.getElementById(containerId); if(!el) return;
   const mySR=overallSR(), myDet=rankDetail(mySR), myTier=RANKS.indexOf(myDet.rank), myDiv=myDet.division, signedIn=window.cloud&&cloud.ready();
   if(!fromRefreshGuard && signedIn && (!lbCache || Date.now()-lbAt>30000)) refreshBoard();
   let others=[];
   if(signedIn){
-    if(scope==='friends') others=FR.friends.map(f=>f.other).filter(Boolean).map(u=>({n:u.username, sr:u.sr||0}));
+    if(scp==='friends') others=FR.friends.map(f=>f.other).filter(Boolean).map(u=>({n:u.username, sr:u.sr||0}));
     else others=(lbCache||[]).filter(u=>u.id!==cloud.user().id).map(u=>({n:u.username, sr:u.sr||0}));
   }
   const rungs=[]; for(let t=ASC;t>=0;t--){ if(t===ASC) rungs.push({t,d:null}); else for(let d=3;d>=1;d--) rungs.push({t,d}); }
@@ -1852,8 +1851,8 @@ function renderLadder(){
       <div class="lright">${isMe?'<span class="tiny" style="color:var(--accent2);font-weight:900;letter-spacing:.5px;">YOU</span>':''}${av}</div>
     </div>`;
   }).join('');
-  document.getElementById('board').innerHTML=`<div class="ladderWrap"><div class="ladderBeam" style="background:linear-gradient(180deg,transparent,${myDet.rank.color}1f 45%,${myDet.rank.color}38);"></div>${body}</div>`;
-  setTimeout(()=>{ const m=document.getElementById('myRung'); if(m) m.scrollIntoView({block:'center',behavior:'auto'}); },70);
+  el.innerHTML=`<div class="ladderWrap"><div class="ladderBeam" style="background:linear-gradient(180deg,transparent,${myDet.rank.color}1f 45%,${myDet.rank.color}38);"></div>${body}</div>`;
+  if(autoScroll) setTimeout(()=>{ const m=document.getElementById('myRung'); if(m) m.scrollIntoView({block:'center',behavior:'auto'}); },70);
 }
 let fromRefreshGuard=false;
 
@@ -2199,7 +2198,7 @@ function renderSettings(){
       <div class="setsec">Legal</div>
       ${setRow(icon('doc',18),'Privacy policy',{onclick:'comingSoon()'})}
       ${setRow(icon('doc',18),'Terms of use',{onclick:'comingSoon()'})}
-      <div class="tiny muted" style="text-align:center;margin-top:22px;">ASCEND prototype · v0.7 · ${window.cloud&&cloud.ready()?'synced to your account':'data stored on this device'}</div>
+      <div class="tiny muted" style="text-align:center;margin-top:22px;">ASCEND prototype · v0.8 · ${window.cloud&&cloud.ready()?'synced to your account':'data stored on this device'}</div>
     </div>`;
 }
 // ---------- Account sheet (for users who skipped the onboarding account step) ----------
