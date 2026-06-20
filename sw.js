@@ -2,10 +2,12 @@
 // so edits show up on a plain reload; big static bundles are cache-first for
 // speed. Everything is cached either way, so the app still opens fully offline.
 // Bump VERSION whenever anatomy.js / exercise-images.js / vendor files / icons change.
-const VERSION = 'ascend-v24';
+const VERSION = 'ascend-v25';
 const DEV = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-const CORE = ['./', 'index.html', 'anatomy.js', 'exercise-images.js', 'vendor/supabase-js.js', 'vendor/zxing.js', 'config.js', 'sync-core.js', 'scanner.js', 'backend.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
-const FRESH = ['config.js', 'sync-core.js', 'scanner.js', 'backend.js'];   // network-first app code
+const APP_JS = ['js/exercises.js','js/ranks.js','js/icons.js','js/state.js','js/scoring.js','js/progress.js','js/nav.js','js/train.js','js/store.js','js/workout.js','js/rank.js','js/profile.js','js/helpers.js','js/social.js','js/onboarding.js','js/nutrition.js','js/boot.js'];
+const CORE = ['./', 'index.html', 'styles.css', ...APP_JS, 'anatomy.js', 'exercise-images.js', 'vendor/supabase-js.js', 'vendor/zxing.js', 'config.js', 'sync-core.js', 'scanner.js', 'backend.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
+// network-first app code (by basename) so edits show on a plain reload
+const FRESH = ['config.js', 'sync-core.js', 'scanner.js', 'backend.js', 'styles.css', ...APP_JS.map(p => p.split('/').pop())];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
