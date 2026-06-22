@@ -63,6 +63,26 @@ function setVal(ei,si,k,v){ S.active.exercises[ei].sets[si][k]=v; save(); }
 function rmExercise(ei){ S.active.exercises.splice(ei,1); save(); renderTrain(); }
 function toggleDone(ei,si){ const s=S.active.exercises[ei].sets[si]; s.done=!s.done; if(s.done) startRest(); save(); renderTrain(); }
 function cancelWorkout(){ if(confirm('Discard this session?')){ S.active=null; rest=0; save(); renderTrain(); } }
+
+// Swipe a set row left to delete it. Delegated on #activeWorkout (survives re-renders); rows
+// carry data-ei/data-si. Horizontal-only — a vertical drag scrolls, a tap still edits the inputs.
+(function(){
+  const KILL=78; let sw=null, x0=0, y0=0, dx=0, decided=false;
+  const fg=()=>sw&&sw.querySelector('.setrow'), del=()=>sw&&sw.querySelector('.swipe-del');
+  function reset(){ const f=fg(),d=del(); if(f){f.style.transition='';f.style.transform='';f.style.opacity='';} if(d)d.style.opacity='0'; sw=null; dx=0; decided=false; }
+  function start(e){ const t=e.target.closest('.swipe'); if(!t){sw=null;return;} sw=t; const p=e.touches[0]; x0=p.clientX; y0=p.clientY; dx=0; decided=false; const f=fg(); if(f) f.style.transition=''; }
+  function move(e){ if(!sw) return; const p=e.touches[0]; dx=p.clientX-x0; const dy=p.clientY-y0;
+    if(!decided){ if(Math.abs(dx)<7 && Math.abs(dy)<7) return; if(Math.abs(dy)>=Math.abs(dx)){ sw=null; return; } decided=true; }
+    if(dx>0) dx=0; const f=fg(),d=del(); if(f) f.style.transform='translateX('+dx+'px)'; if(d) d.style.opacity=Math.min(1,-dx/KILL); e.preventDefault(); }
+  function end(){ if(!sw||!decided){ if(sw&&!decided) reset(); return; } const f=fg();
+    if(dx<=-KILL){ const ei=+sw.dataset.ei, si=+sw.dataset.si;
+      if(f){ f.style.transition='transform .14s ease, opacity .14s'; f.style.transform='translateX(-110%)'; f.style.opacity='0'; }
+      haptic([0,28]); const t=sw; sw=null; setTimeout(()=>rmSet(ei,si),120);
+    } else { if(f) f.style.transition='transform .18s ease'; const d=del(); reset(); if(f){ f.style.transform=''; } }
+  }
+  const c=document.getElementById('activeWorkout');
+  if(c){ c.addEventListener('touchstart',start,{passive:true}); c.addEventListener('touchmove',move,{passive:false}); c.addEventListener('touchend',end); c.addEventListener('touchcancel',reset); }
+})();
 // ----- Finish workout review (bodyweight capture + optional share) -----
 let finMedia=null, finShare=false, finCapText='';
 function finishWorkout(){

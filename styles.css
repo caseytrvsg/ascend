@@ -151,6 +151,10 @@
 
   .exwrap{border:1px solid var(--line2); border-radius:14px; padding:12px; margin-bottom:12px; background:var(--card2);}
   .setrow{display:grid; grid-template-columns:26px 52px 1fr 1fr 34px; gap:7px; align-items:center; margin-bottom:7px;}
+  /* swipe-left-to-delete a set row */
+  .swipe{position:relative; overflow:hidden; border-radius:10px; margin-bottom:7px; touch-action:pan-y;}
+  .swipe-del{position:absolute; inset:0; background:var(--bad); border-radius:10px; display:flex; align-items:center; justify-content:flex-end; padding-right:18px; color:#fff; opacity:0;}
+  .swipe .setrow{margin-bottom:0; position:relative; z-index:1; background:var(--card2); will-change:transform;}
   .setrow .sn{color:var(--mut); font-weight:700; text-align:center; font-size:13px;}
   .setrow .prev{color:var(--mut2); text-align:center; font-size:12px; overflow:hidden; white-space:nowrap;}
   .setrow input{padding:9px 4px; text-align:center; font-size:15px;}

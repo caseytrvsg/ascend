@@ -243,12 +243,15 @@ function renderTrain(){
       <div class="colhdr"><div>SET</div><div>PREV</div><div>${S.units.toUpperCase()}</div><div>REPS</div><div></div></div>`;
     ex.sets.forEach((set,si)=>{
       const p=prev&&prev[si]; const ptxt=p?`${p.weight}×${p.reps}`:'—';
-      html+=`<div class="setrow ${set.done?'done':''}">
-        <div class="sn">${si+1}</div>
-        <div class="prev">${ptxt}</div>
-        <input type="number" inputmode="decimal" placeholder="${p?p.weight:'wt'}" value="${set.weight||''}" onchange="setVal(${ei},${si},'weight',this.value)">
-        <input type="number" inputmode="numeric" placeholder="${p?p.reps:'reps'}" value="${set.reps||''}" onchange="setVal(${ei},${si},'reps',this.value)">
-        <button class="ck ${set.done?'on':''}" onclick="toggleDone(${ei},${si})">✓</button>
+      html+=`<div class="swipe" data-ei="${ei}" data-si="${si}">
+        <div class="swipe-del">${icon('trash',18)}</div>
+        <div class="setrow ${set.done?'done':''}">
+          <div class="sn">${si+1}</div>
+          <div class="prev">${ptxt}</div>
+          <input type="number" inputmode="decimal" placeholder="${p?p.weight:'wt'}" value="${set.weight||''}" onchange="setVal(${ei},${si},'weight',this.value)">
+          <input type="number" inputmode="numeric" placeholder="${p?p.reps:'reps'}" value="${set.reps||''}" onchange="setVal(${ei},${si},'reps',this.value)">
+          <button class="ck ${set.done?'on':''}" onclick="toggleDone(${ei},${si})">✓</button>
+        </div>
       </div>`;
     });
     html+=`<button class="btn ghost sm" style="width:100%;margin-top:4px;" onclick="addSet(${ei})">＋ Add set</button></div>`;
