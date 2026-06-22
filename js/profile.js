@@ -340,7 +340,7 @@ function renderSettings(){
       <div class="setsec">Legal</div>
       ${setRow(icon('doc',18),'Privacy policy',{onclick:'comingSoon()'})}
       ${setRow(icon('doc',18),'Terms of use',{onclick:'comingSoon()'})}
-      <div class="tiny muted" style="text-align:center;margin-top:22px;">ASCEND prototype · v0.16 · ${window.cloud&&cloud.ready()?'synced to your account':'data stored on this device'}</div>
+      <div class="tiny muted" style="text-align:center;margin-top:22px;">ASCEND prototype · v0.17 · ${window.cloud&&cloud.ready()?'synced to your account':'data stored on this device'}</div>
     </div>`;
 }
 // ---------- Account sheet (for users who skipped the onboarding account step) ----------

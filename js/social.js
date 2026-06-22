@@ -186,6 +186,26 @@ function duelRow(d){
   }
   return '';
 }
+// ----- Matchup (VS) card: each lifter on their own banner, avatar ringed by their border -----
+function bannerBg(bannerId, rankColor){ const it=bannerId&&findItem(bannerId); return (it&&it.bg)||`linear-gradient(160deg, ${rankColor}29, #0c0c12)`; }
+function borderRing(borderId){ const it=borderId&&findItem(borderId); return (it&&it.ring)||'none'; }
+function compRankOf(comp){ return RANKS[(comp&&comp.tier)||0]||RANKS[0]; }
+function vsSide(name, rank, bannerId, borderId){
+  return `<div class="dvside" style="background:${bannerBg(bannerId,rank.color)};">
+    <div class="dvav" style="background:${rank.color};box-shadow:${borderRing(borderId)};">${(name||'?').slice(0,2).toUpperCase()}</div>
+    <div class="dvname">${escapeAttr(name||'?')}</div>
+    <div class="dvrank" style="color:${rank.color};">${rankEmblem(rank,15)} ${escapeAttr(rank.name)}</div>
+  </div>`;
+}
+function vsBlock(them, exId){
+  const myR=compRankOf(S.comp), tR=compRankOf(them.comp);
+  return `<div class="dvwrap"><div class="dvcard">
+    ${vsSide(S.name||'You', myR, S.banner, S.border)}
+    ${vsSide(them.username||'?', tR, them.banner, them.border)}
+    <div class="dvmid">VS</div>
+  </div><div class="dvlift">${icon('swords',13)} ${escapeAttr(duelLiftName(exId))} · heaviest verified lift wins</div></div>`;
+}
+
 function renderCompete(){
   const el=document.getElementById('competeBody');
   const signedIn=window.cloud&&cloud.ready();
@@ -210,9 +230,9 @@ function renderCompete(){
   if(compView==='submit'){ const d=activeDuel; if(!d){ compView='home'; }
     else { const them=d.them||{username:'?'};
     el.innerHTML=`<div class="head"><h1>${duelLiftName(d.ex_id)}</h1></div>
+    ${vsBlock(them, d.ex_id)}
     <div class="card">
-      <div class="tiny muted" style="text-align:center;text-transform:uppercase;letter-spacing:1px;font-weight:800;margin-bottom:4px;">Your lift vs ${escapeAttr(them.username)}</div>
-      <p class="sub" style="text-align:center;">Load the bar, lift it, and photograph the weight as proof. Heaviest verified lift wins.</p>
+      <p class="sub" style="text-align:center;margin-top:0;">Load the bar, lift it, and photograph the weight as proof. Heaviest verified lift wins.</p>
       <label class="f">Weight lifted (${S.units})</label>
       <input id="duelW" type="number" inputmode="decimal" placeholder="weight" style="margin-bottom:12px;">
       ${duelPhoto?`<div style="position:relative;"><img src="${duelPhoto}" style="width:100%;border-radius:12px;display:block;"><div class="pill" style="position:absolute;top:8px;left:8px;color:var(--good);border-color:var(--good);background:#0a0a0fcc;">✓ Proof attached</div><button class="btn danger sm" style="position:absolute;top:8px;right:8px;padding:6px 10px;" onclick="duelPhoto=null;renderCompete();">✕</button></div>`

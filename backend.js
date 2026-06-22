@@ -224,7 +224,7 @@ window.cloud = (() => {
   };
   const listDuels = async () => {
     const { data } = await sb.from('duels')
-      .select('*, c:profiles!duels_challenger_fkey(id,username,sr,comp), o:profiles!duels_opponent_fkey(id,username,sr,comp)')
+      .select('*, c:profiles!duels_challenger_fkey(id,username,sr,comp,banner,border), o:profiles!duels_opponent_fkey(id,username,sr,comp,banner,border)')
       .order('created_at', { ascending:false }).limit(40);
     const uid = me();
     return (data || []).map(d => ({ ...d, iAmChallenger: d.challenger === uid,
