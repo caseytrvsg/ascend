@@ -142,15 +142,11 @@ function commitFinish(){
   const shard=shardsForSession(a, prCount);
   S.shards=(S.shards||0)+shard.gain;
   const afterDet=rankDetail(overallSR()), xpAfter=totalXP(), lvlAfter=levelInfo(xpAfter).level;
-  const rankedUp=rankOrdinal(afterDet)>rankOrdinal(beforeDet);
-  const pr=prHeadline(a);
   const cap=finShare?((document.getElementById('finCap')||{}).value || finCapText || '').trim():null;
   const workoutPayload={title:guessSplit(a), sets:a.exercises.reduce((x,e)=>x+e.sets.length,0), vol:sessionVolume(a), act:activationForSession(a), units:S.units};
   if(window.cloud && cloud.ready()){
-    // Cloud feed: explicit workout share + automatic achievement posts.
+    // Feed is user-posts only: post ONLY when the user opted into "Share to feed". No automatic rank-up / PR posts.
     if(finShare){ cloud.createPost('post', {caption:cap, workout:workoutPayload}, finMedia).then(()=>refreshFeed()).catch(()=>{}); }
-    if(rankedUp){ cloud.createPost('rankup', {rank:afterDet.rank.name+(afterDet.division?' '+afterDet.division:''), sr:Math.round(overallSR())}).then(()=>refreshFeed()).catch(()=>{}); }
-    else if(pr){ cloud.createPost('pr', {lift:pr.lift, wt:pr.wt, reps:pr.reps, units:pr.units}).then(()=>refreshFeed()).catch(()=>{}); }
   } else if(finShare){
     S.posts=S.posts||[];
     S.posts.unshift({type:'post', caption:cap, media:finMedia, workout:workoutPayload, when:'now', likes:0, comments:0, ts:Date.now()});
