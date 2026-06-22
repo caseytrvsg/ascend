@@ -1,9 +1,12 @@
 // ---------- helpers ----------
 function fmt(n){ n=Math.round(n); return n>=1000?(n/1000).toFixed(n>=10000?0:1)+'k':''+n; }
 function fmtClock(ms){ const s=Math.floor(ms/1000), h=Math.floor(s/3600), m=Math.floor(s%3600/60), ss=s%60; return (h?h+':':'')+(h?String(m).padStart(2,'0'):m)+':'+String(ss).padStart(2,'0'); }
-let modalZ=100;   // modals opened later stack above ones already open (e.g. exercise picker over routine builder)
+// Base 130 keeps modals ABOVE the full-screen overlays (Settings/Analysis/Streaks/Store/Chat are z-120),
+// so a sheet opened from inside Settings (e.g. Edit profile) shows immediately instead of waiting for
+// Settings to close. Each later modal stacks above earlier ones (e.g. exercise picker over routine builder).
+let modalZ=130;
 function openModal(id){ const m=document.getElementById(id); m.style.zIndex=++modalZ; m.classList.add('open'); }
-function closeModal(id){ document.getElementById(id).classList.remove('open'); if(id==='scanModal'&&window.Scanner) Scanner.stop(); if(!document.querySelector('.modal.open')) modalZ=100; }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); if(id==='scanModal'&&window.Scanner) Scanner.stop(); if(!document.querySelector('.modal.open')) modalZ=130; }
 let toastT; function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2200); }
 ['exModal','addExModal','routineModal','genModal','composeModal','memoryModal','allMemModal','editModal','finishModal','scanModal','friendsModal','proModal','accountModal'].forEach(id=>document.getElementById(id).addEventListener('click',e=>{ if(e.target.id===id) closeModal(id); }));
 

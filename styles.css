@@ -162,7 +162,7 @@
   .rest{display:flex; align-items:center; gap:10px; background:#1a2230; border:1px solid #2a3a52; border-radius:14px; padding:10px 12px; margin-bottom:10px;}
   .rest .t{font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; color:#7fb8ff;}
 
-  .modal{position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:100; display:none; align-items:flex-end; backdrop-filter:blur(4px);}
+  .modal{position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:130; display:none; align-items:flex-end; backdrop-filter:blur(4px);}
   .modal.open{display:flex; animation:fade .2s;}
   .sheet{background:var(--bg2); width:100%; max-width:480px; margin:0 auto; border-radius:24px 24px 0 0; padding:18px 16px calc(18px + var(--safe-bottom)); max-height:88vh; overflow-y:auto; overscroll-behavior:contain; animation:slideup .28s cubic-bezier(.2,.8,.2,1);}
   .sheethead{position:sticky; top:-18px; margin:-18px -16px 10px; padding:12px 16px 10px; background:var(--bg2); z-index:5; border-radius:24px 24px 0 0;}
