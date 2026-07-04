@@ -43,15 +43,23 @@ document.querySelectorAll('.modal').forEach(mod=>{
     y0=null; dy=0;
   });
 });
-// PWA: offline cache (service workers need HTTPS or localhost — silently skipped on plain LAN HTTP)
-if('serviceWorker' in navigator && (location.protocol==='https:'||['localhost','127.0.0.1'].includes(location.hostname))){
+// PWA: offline cache. On the DEV server (localhost) we do NOT register a worker and
+// actively unregister any existing one + wipe its caches — a stale worker left over from
+// a previous version otherwise serves an outdated shell (e.g. unstyled after a refactor).
+// Production (HTTPS) registers as normal so the installed app still works offline.
+if('serviceWorker' in navigator){
   const isDev=['localhost','127.0.0.1'].includes(location.hostname);
-  const hadController=!!navigator.serviceWorker.controller;   // true ⇒ this is an update, not a first install
-  navigator.serviceWorker.register('sw.js').then(reg=>{
-    setInterval(()=>reg.update().catch(()=>{}), 60*60*1000);  // check for a new version hourly
-    reg.addEventListener('updatefound',()=>{ const nw=reg.installing; if(!nw) return;
-      nw.addEventListener('statechange',()=>{ if(nw.state==='activated' && hadController && !isDev) showUpdateBar(); }); });
-  }).catch(()=>{});
+  if(isDev){
+    navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
+    if(window.caches) caches.keys().then(ks=>ks.forEach(k=>caches.delete(k))).catch(()=>{});
+  } else if(location.protocol==='https:'){
+    const hadController=!!navigator.serviceWorker.controller;   // true ⇒ this is an update, not a first install
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      setInterval(()=>reg.update().catch(()=>{}), 60*60*1000);  // check for a new version hourly
+      reg.addEventListener('updatefound',()=>{ const nw=reg.installing; if(!nw) return;
+        nw.addEventListener('statechange',()=>{ if(nw.state==='activated' && hadController) showUpdateBar(); }); });
+    }).catch(()=>{});
+  }
 }
 // Non-disruptive "a new version is ready" prompt — never auto-reloads mid-session.
 function showUpdateBar(){

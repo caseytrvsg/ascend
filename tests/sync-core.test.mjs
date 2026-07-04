@@ -17,6 +17,13 @@ test('profileToRow / profileFromRow roundtrip the fields that matter', () => {
   assert.equal(back.bw, 185); assert.equal(back.name, 'Casey'); assert.equal(back.profileUpdatedAt, 500);
 });
 
+test('sr is rounded to an integer (sr column is int — a float 400s the PATCH)', () => {
+  assert.equal(C.profileToRow({ sr: 169.3121693121693 }, 1).sr, 169);
+  assert.equal(C.profileToRow({ sr: 0 }, 1).sr, 0);
+  assert.equal(C.profileToRow({}, 1).sr, 0);
+  assert.equal(Number.isInteger(C.profileToRow({ sr: 42.9 }, 1).sr), true);
+});
+
 test('client never writes server-authoritative entitlement columns', () => {
   const S = { pro:true, comp:{ tier:9 }, shards:99999, bw:185 };
   const row = C.profileToRow(S, 1);

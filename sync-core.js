@@ -11,7 +11,8 @@ window.SyncCore = (() => {
     calories:S.calories??null, body_fat:S.bodyFat??null, shards:S.shards||0,
     owned:S.owned||[], inv:S.inv||{}, theme:S.theme||'th_mid', border:S.border||'bd_none',
     banner:S.banner||'bn_none', boost:S.boost||null, streak:S.stk||null,
-    sr:S.sr||0,
+    sr:Math.round(S.sr||0),   // sr column is an integer — overallSR() is a float, so round or the PATCH 400s
+
     updated_at: now
   });
   // Effective Pro = the server flag, honoring an expiry if one is set (client clock is fine here —
