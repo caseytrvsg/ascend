@@ -89,8 +89,8 @@ let composeMedia=null, composeWorkout=false;
 function escapeHtml(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/\n/g,'<br>'); }
 function openCompose(){ composeMedia=null; composeWorkout=!!S.sessions.length; document.getElementById('composeCap').value=''; renderComposePreview(); openModal('composeModal'); }
 // Shared image reader: downscales to <=900px and returns a JPEG data-URL via cb.
-function readImage(input, cb){ const f=input.files&&input.files[0]; if(!f) return; const rd=new FileReader();
-  rd.onload=()=>{ const img=new Image(); img.onload=()=>{ const c=document.createElement('canvas'), max=900; let w=img.width,h=img.height;
+function readImage(input, cb, maxPx){ const f=input.files&&input.files[0]; if(!f) return; const rd=new FileReader();
+  rd.onload=()=>{ const img=new Image(); img.onload=()=>{ const c=document.createElement('canvas'), max=maxPx||900; let w=img.width,h=img.height;
     if(w>h&&w>max){h=Math.round(h*max/w);w=max;} else if(h>=w&&h>max){w=Math.round(w*max/h);h=max;}
     c.width=w;c.height=h; c.getContext('2d').drawImage(img,0,0,w,h); cb(c.toDataURL('image/jpeg',0.72)); };
     img.src=rd.result; }; rd.readAsDataURL(f); }

@@ -19,10 +19,23 @@ function openPro(){
 }
 function upgradeProDemo(){ S.pro=true; save(); closeModal('proModal'); haptic([0,40,40,80]); toast('Pro unlocked ⭐'); renderProfile(); }
 function setPro(b){ S.pro=b; save(); if(document.getElementById('settingsScreen').classList.contains('show')) renderSettings(); renderProfile(); toast(b?'Pro enabled':'Pro disabled'); }
+// ----- Profile photo & banner (user-uploaded, stored on this device) -----
+function pickAvatar(input){ readImage(input, u=>{ S.avatar=u; save(); renderProfile(); haptic([0,20]); toast('Profile photo updated'); }, 320); input.value=''; }
+function pickBanner(input){ readImage(input, u=>{ S.bannerImg=u; save(); renderProfile(); haptic([0,20]); toast('Banner updated'); }, 1000); input.value=''; }
+function removeAvatar(){ S.avatar=null; save(); renderProfile(); toast('Profile photo removed'); }
+function removeBanner(){ S.bannerImg=null; save(); renderProfile(); toast('Banner removed'); }
 function renderProfile(){
   const sr=overallSR(), det=rankDetail(sr), r=det.rank;
   document.getElementById('pfName').textContent=S.name;
-  document.getElementById('pfAvatar').textContent=(S.name||'A').slice(0,1).toUpperCase();
+  // avatar: uploaded photo, else the name's initial
+  const av=document.getElementById('pfAvatar');
+  if(S.avatar){ av.style.backgroundImage='url("'+S.avatar+'")'; av.textContent=''; }
+  else { av.style.backgroundImage=''; av.textContent=(S.name||'A').slice(0,1).toUpperCase(); }
+  document.getElementById('pfAvatarRemove').style.display=S.avatar?'flex':'none';
+  // banner: uploaded image, else a rank-tinted gradient
+  const bn=document.getElementById('pfBanner');
+  bn.style.backgroundImage=S.bannerImg?('url("'+S.bannerImg+'")'):`linear-gradient(120deg,#241d3f,${r.color}44 60%,${r.color})`;
+  document.getElementById('pfBannerRemove').style.display=S.bannerImg?'flex':'none';
   document.getElementById('pfRankLine').innerHTML=`<span style="color:${r.color}">${r.name}${det.division?' '+det.division:''}</span> · ${det.ascended?det.sr+' SR':det.sr+' / 100 SR'}`;
   document.getElementById('pfBadge').innerHTML=rankEmblem(r,40,det.division);
   document.getElementById('pfGoal').textContent=S.goal||'—';

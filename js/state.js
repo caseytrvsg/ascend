@@ -9,7 +9,8 @@ function defaultRoutines(){ return [
 ]; }
 function fresh(){ return { name:'Athlete', bw:180, units:'lb', heightCm:null, heightUnit:'cm', age:null, activity:'moderate', bodyFat:null, goal:null, calories:null,
   sessions:[], active:null, routines:defaultRoutines(), comp:{tier:0, div:0, sr:0, wins:0, losses:0, streak:0}, posts:[], meals:[], pro:false,
-  shards:120, owned:['th_mid','bd_none','bn_none'], inv:{}, boost:null, theme:'th_mid', border:'bd_none', banner:'bn_none', deals:null, onboarded:false }; }
+  shards:120, owned:['th_mid','bd_none','bn_none'], inv:{}, boost:null, theme:'th_mid', border:'bd_none', banner:'bn_none', deals:null, onboarded:false,
+  avatar:null, bannerImg:null }; }   // avatar / bannerImg: user-uploaded profile photo & banner (downscaled data URLs, stored on this device)
   // NOTE: streak state (S.stk / S.stkLost) is intentionally NOT in fresh() — undefined triggers deriveStreak() migration from session history.
 function save(){
   if(window.cloud && cloud.ready()){ S.profileUpdatedAt=Date.now(); try{ S.sr=overallSR(); }catch(e){} }
