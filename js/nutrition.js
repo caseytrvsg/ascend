@@ -82,7 +82,8 @@ function renderNutrition(){
     : `<div class="empty">No meals logged today — scan one!</div>`;
   document.getElementById('nutBody').innerHTML=`
     <button class="btn" onclick="openScan()" style="margin-bottom:10px;">${icon('camera',17)} Scan a meal</button>
-    <button class="btn ghost" onclick="openBarcode()" style="margin-bottom:14px;">${icon('barcode',17)} Scan a barcode</button>
+    <button class="btn ghost" onclick="openBarcode()" style="margin-bottom:10px;">${icon('barcode',17)} Scan a barcode</button>
+    <button class="btn ghost" onclick="openManualMeal()" style="margin-bottom:14px;">${icon('clipboard',17)} Type your meal</button>
     <div class="card" style="text-align:center;">
       <div class="calring">
         <svg width="170" height="170" viewBox="0 0 170 170">
@@ -220,8 +221,42 @@ function logBarcode(){ const pr=barcodeProduct; if(!pr) return; const day=new Da
     kcal:Math.round(pr.kcal*bcServings), p:+(pr.p*bcServings).toFixed(1), c:+(pr.c*bcServings).toFixed(1), f:+(pr.f*bcServings).toFixed(1)});
   if(window.cloud && cloud.ready()) cloud.mark('meals', S.meals[S.meals.length-1].ts);
   save(); closeModal('scanModal'); haptic([0,30,40,30]); renderNutrition(); toast('Logged '+pr.name); }
+// ----- Manual entry — type exactly what you ate, with your own macros -----
+function openManualMeal(){ scanView='manual'; renderScanSheet(); openModal('scanModal'); setTimeout(()=>{ const n=document.getElementById('mfName'); if(n) n.focus(); },40); }
+function logManualMeal(){
+  const g=id=>document.getElementById(id);
+  const name=(g('mfName').value||'').trim();
+  if(!name){ toast('Name your meal'); return; }
+  const p=+g('mfP').value||0, c=+g('mfC').value||0, f=+g('mfF').value||0;
+  let kcal=Math.round(+g('mfKcal').value||0);
+  if(!kcal && (p||c||f)) kcal=Math.round(p*4 + c*4 + f*9);   // fill calories from macros if left blank
+  if(!kcal && !p && !c && !f){ toast('Add calories or macros'); return; }
+  const serving=(g('mfServing').value||'').trim()||'1 serving';
+  const day=new Date().toDateString(); S.meals=S.meals||[];
+  const ts=Date.now();
+  S.meals.push({day, ts, name, emoji:'🍽️', serving, mult:1, kcal, p:+p.toFixed(1), c:+c.toFixed(1), f:+f.toFixed(1)});
+  if(window.cloud && cloud.ready()) cloud.mark('meals', ts);
+  save(); closeModal('scanModal'); haptic([0,30,40,30]); renderNutrition(); toast('Meal logged 🍽️');
+}
 function renderScanSheet(){
   const el=document.getElementById('scanSheet');
+  if(scanView==='manual'){
+    el.innerHTML=`<div class="grab"></div><h2 style="margin:0 0 4px;">Type your meal</h2>
+      <p class="sub">Enter exactly what you had and its macros. Leave calories blank to auto-fill from protein / carbs / fat.</p>
+      <label class="f">What did you eat?</label>
+      <input id="mfName" placeholder="e.g. Mum's chicken curry" style="margin-bottom:10px;">
+      <label class="f">Serving <span class="muted">(optional)</span></label>
+      <input id="mfServing" placeholder="e.g. 1 bowl, 300g" style="margin-bottom:10px;">
+      <label class="f">Calories <span class="muted">(optional)</span></label>
+      <input id="mfKcal" type="number" inputmode="numeric" placeholder="kcal" style="margin-bottom:10px;">
+      <div class="row" style="gap:10px;align-items:flex-start;">
+        <div class="grow"><label class="f">Protein (g)</label><input id="mfP" type="number" inputmode="decimal" placeholder="0"></div>
+        <div class="grow"><label class="f">Carbs (g)</label><input id="mfC" type="number" inputmode="decimal" placeholder="0"></div>
+        <div class="grow"><label class="f">Fat (g)</label><input id="mfF" type="number" inputmode="decimal" placeholder="0"></div>
+      </div>
+      <button class="btn good" style="margin-top:16px;" onclick="logManualMeal()">Log meal</button>
+      <button class="btn ghost" style="margin-top:8px;" onclick="closeModal('scanModal')">Cancel</button>`; return;
+  }
   if(scanView==='barcode'){
     el.innerHTML=`<div class="grab"></div><h2 style="margin:0 0 12px;">Scan a barcode</h2>
       <div class="bcview">
