@@ -126,6 +126,54 @@ function actColorFn(actMap){
   const max=Math.max(1,...GROUPS.map(g=>actMap[g]||0));
   return g=>{ const v=actMap[g]||0; if(v<=0) return '#1b1b26'; const t=Math.min(1,v/max); return mixc('#17171f', VOL_COLOR, 0.18+0.82*t); };
 }
+// ---------- Strength progress (per muscle group, over time) ----------
+let progGroup='Overall';
+function setProgGroup(g){ progGroup=g; renderBodygraph(); }
+// SR for the chosen group after each chronological session (cumulative bests). Skips sessions
+// before the group was first trained, so the line starts when the data does.
+function groupSRSeries(group){
+  const ses=S.sessions.slice().sort((a,b)=>a.start-b.start), out=[];
+  for(let i=0;i<ses.length;i++){
+    const sub=ses.slice(0,i+1);
+    const v = group==='Overall' ? overallSRfrom(sub) : groupSRfrom(bestLiftsFrom(sub), group);
+    if(v!=null) out.push(v);
+  }
+  return out;
+}
+function srLineSVG(pts, color, id){
+  const W=300,H=132,pad=10;
+  let mn=Math.min(...pts), mx=Math.max(...pts);
+  if(mx-mn<10){ const mid=(mx+mn)/2; mn=Math.max(0,mid-10); mx=mid+10; } else { mn=Math.max(0,mn-6); mx=mx+6; }
+  const xs=i=>pad+i*(W-2*pad)/(pts.length-1), ys=v=>H-pad-(v-mn)/(mx-mn)*(H-2*pad);
+  const line=pts.map((v,i)=>`${i?'L':'M'}${xs(i).toFixed(1)} ${ys(v).toFixed(1)}`).join(' ');
+  const area=`M${xs(0)} ${H-pad} `+pts.map((v,i)=>`L${xs(i).toFixed(1)} ${ys(v).toFixed(1)}`).join(' ')+` L${xs(pts.length-1)} ${H-pad} Z`;
+  return `<svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;">
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".34"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+    <path d="${area}" fill="url(#${id})"/><path d="${line}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    ${pts.map((v,i)=>`<circle cx="${xs(i).toFixed(1)}" cy="${ys(v).toFixed(1)}" r="2.3" fill="${color}"/>`).join('')}
+  </svg>`;
+}
+function renderStrengthProgress(){
+  const groups=['Overall'].concat(GROUPS);
+  const chips=groups.map(g=>`<div class="chip ${progGroup===g?'on':''}" onclick="setProgGroup('${g}')">${g}</div>`).join('');
+  const pts=groupSRSeries(progGroup);
+  let body;
+  if(pts.length<2){
+    body=`<div class="empty" style="padding:20px 10px;">${progGroup==='Overall'?'Log a couple of sessions':'Train '+progGroup.toLowerCase()+' across a couple of sessions'} to chart your strength climb.</div>`;
+  } else {
+    const cur=pts[pts.length-1], delta=Math.round(cur-pts[0]), rk=rankFor(cur), col=rk.color;
+    body=`<div class="row sb" style="margin-bottom:8px;">
+        <div><div style="font-weight:900;font-size:22px;color:${col};line-height:1;">${Math.round(cur)} <span class="tiny muted" style="font-weight:700;">SR</span></div>
+          <div class="tiny" style="color:${col};font-weight:700;margin-top:3px;">${rk.name}</div></div>
+        <div style="text-align:right;"><div style="font-weight:800;font-size:15px;color:${delta>=0?'var(--good)':'var(--bad)'};">${delta>=0?'+':''}${delta} SR</div>
+          <div class="tiny muted">across ${pts.length} sessions</div></div>
+      </div>${srLineSVG(pts, col, 'sgrad_'+progGroup)}`;
+  }
+  return `<div class="card">
+    <div class="row sb" style="margin-bottom:10px;"><div style="font-weight:800;">${icon('chart',18)} Strength progress</div></div>
+    <div class="chiprow" style="margin-bottom:12px;">${chips}</div>
+    ${body}</div>`;
+}
 function renderBodygraph(){
   const volMode = bodyColorMode==='volume';
   const colorFn = volMode ? actColorFn(activationAllTime()) : (g=>gColor(g));
@@ -146,6 +194,7 @@ function renderBodygraph(){
     ${legend}
     <div class="tiny" style="color:var(--mut2);margin-top:6px;">Anatomy: react-native-body-highlighter · MIT</div>
   </div>
+  ${renderStrengthProgress()}
   <h2>Muscle rankings</h2>`;
   GROUPS.forEach(g=>{
     const s=groupSR(g); const rk=s==null?null:rankFor(s); const open=!!openGroups[g];
