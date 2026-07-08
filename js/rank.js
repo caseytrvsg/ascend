@@ -17,6 +17,9 @@ function renderOverview(){
   document.getElementById('rankGlow').style.background=r.color;
   const pct = nx ? (sr-r.min)/(nx.min-r.min) : 1;
   const C=2*Math.PI*88;
+  // Rank name auto-fits the ring: short names stay 20px, long ones (e.g. "Featherweight 3") scale down.
+  const rankLabel = `${r.name}${det.division?' '+det.division:''}`;
+  const rankFS = Math.max(14, Math.min(20, Math.floor(150/(rankLabel.length*0.62))));
   // total volume & PRs
   const totalVol=S.sessions.reduce((a,s)=>a+sessionVolume(s),0), best=bestLifts();
   const ratios=Object.entries(best).map(([id,b])=>b.w/S.bw), bestRatio=ratios.length?Math.max(...ratios):0;
@@ -31,7 +34,7 @@ function renderOverview(){
         </svg>
         <div class="ringcenter">
           <div class="embFloat" style="filter:drop-shadow(0 0 18px ${r.color}66);">${rankEmblem(r,80,det.division)}</div>
-          <div style="font-size:20px;font-weight:800;margin-top:2px;color:${r.color}">${r.name}${det.division?' '+det.division:''}</div>
+          <div style="font-size:${rankFS}px;font-weight:800;margin-top:2px;color:${r.color};white-space:nowrap;">${rankLabel}</div>
           <div class="tiny muted">${det.ascended?det.sr+' SR':det.sr+' / 100 SR'}</div>
         </div>
       </div>

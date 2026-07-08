@@ -18,13 +18,19 @@ document.addEventListener('click',e=>{ if(e.target.closest('button')) haptic(12)
 
 // ---------- Rank-up celebration ----------
 function rankOrdinal(det){ return RANKS.indexOf(det.rank)*3 + (det.division? (det.division-1) : 3); }
+// hex "#rrggbb" -> "rgba(r,g,b,a)" — used to tint the celebration card to the rank colour.
+function hexA(hex,a){ const n=parseInt(hex.slice(1),16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
 function celebrateRankUp(oldDet,newDet){
   const r=newDet.rank, c=r.color, tierUp=RANKS.indexOf(newDet.rank)>RANKS.indexOf(oldDet.rank);
   let rays=''; for(let i=0;i<24;i++){ const a0=i*15*Math.PI/180, a1=(i*15+3.4)*Math.PI/180;
     rays+=`<polygon points="100,100 ${(100+Math.cos(a0)*120).toFixed(1)},${(100+Math.sin(a0)*120).toFixed(1)} ${(100+Math.cos(a1)*120).toFixed(1)},${(100+Math.sin(a1)*120).toFixed(1)}" fill="${c}" opacity="${i%2?0.45:0.9}"/>`; }
   document.getElementById('celRays').innerHTML=`<svg viewBox="0 0 200 200" style="overflow:visible">${rays}</svg>`;
   document.getElementById('celGlow').style.background=c;
-  document.getElementById('celEmblem').innerHTML=rankEmblem(r,150,newDet.division);
+  // Tint the full-screen backdrop + kicker to the rank colour so every rank celebrates in its own hue.
+  // Rank-tint layer over a fully OPAQUE dark base so the app behind never shows through.
+  document.getElementById('celebrate').style.background=`radial-gradient(circle at 50% 42%, ${hexA(c,.28)} 0%, transparent 60%), radial-gradient(circle at 50% 42%, #1a1230 0%, #0a0810 55%, #050508 100%)`;
+  document.getElementById('celKicker').style.color=mixHex(c,1,.6);
+  document.getElementById('celEmblem').innerHTML=rankEmblem(r,250,newDet.division);
   document.getElementById('celKicker').textContent=tierUp?'NEW TIER UNLOCKED':'RANK UP';
   document.getElementById('celRank').textContent=`${r.name}${newDet.division?' '+newDet.division:''}`;
   document.getElementById('celRank').style.color=c;
