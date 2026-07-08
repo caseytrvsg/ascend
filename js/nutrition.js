@@ -104,7 +104,7 @@ function aiPlanCard(){
   const need = !S.heightCm || !S.age;
   return `<div class="card">
     <div class="row sb" style="margin-bottom:10px;"><div style="font-weight:800;">🤖 Your AI plan</div>
-      <div class="pill" style="border-color:#7c5cff66;color:var(--accent2);">${S.goal||'Set a goal'}</div></div>
+      <div class="pill" style="border-color:var(--accent);color:var(--accent2);">${S.goal||'Set a goal'}</div></div>
     ${bmi?`<div class="row sb" style="margin-bottom:10px;"><div class="tiny muted">BMI</div>
       <div style="font-weight:700;">${bmi.bmi} · <span style="color:${bmi.cat==='Normal'?'var(--good)':bmi.cat==='Underweight'||bmi.cat==='Overweight'?'var(--warn)':'var(--bad)'}">${bmi.cat}</span></div></div>
       <div class="divider" style="margin:0 0 10px;"></div>`:''}
