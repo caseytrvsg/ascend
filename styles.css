@@ -106,6 +106,16 @@
 
   .lift{display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--line);}
   .lift:last-child{border-bottom:none;}
+  /* Finish-workout "Your workout" dropdown — expands as an overlay layered in front of
+     the sheet (absolute, so the page underneath doesn't shift when it opens). */
+  .findrop{position:relative; margin:0 0 14px; z-index:6;}
+  .findrop-head{display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; text-align:left; background:var(--card); border:1px solid var(--line2); border-radius:16px; padding:11px 14px; color:var(--txt);}
+  .findrop-head:active{border-color:var(--accent);}
+  .findrop-chev{color:var(--mut); font-size:18px; line-height:1; flex-shrink:0; transition:transform .22s;}
+  .findrop.open .findrop-chev{transform:rotate(180deg);}
+  .findrop-panel{position:absolute; left:0; right:0; top:calc(100% + 6px); background:var(--bg2); border:1px solid var(--line2); border-radius:16px; box-shadow:0 18px 44px rgba(0,0,0,.6); overflow:hidden; max-height:0; opacity:0; pointer-events:none; transform:translateY(-6px); transition:max-height .26s cubic-bezier(.2,.8,.2,1), opacity .18s, transform .26s;}
+  .findrop.open .findrop-panel{max-height:340px; opacity:1; pointer-events:auto; transform:none;}
+  .findrop-inner{max-height:340px; overflow-y:auto; overscroll-behavior:contain; padding:2px 14px;}
   .liftmark{width:38px; height:38px; border-radius:11px; background:var(--card2); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;}
   @keyframes exf{0%,100%{opacity:0} 50%{opacity:1}}
   .exf{animation:exf 1.8s ease-in-out infinite;}

@@ -84,13 +84,16 @@ function cancelWorkout(){ if(confirm('Discard this session?')){ S.active=null; r
   if(c){ c.addEventListener('touchstart',start,{passive:true}); c.addEventListener('touchmove',move,{passive:false}); c.addEventListener('touchend',end); c.addEventListener('touchcancel',reset); }
 })();
 // ----- Finish workout review (bodyweight capture + optional share) -----
-let finMedia=null, finShare=false, finCapText='';
+let finMedia=null, finShare=false, finCapText='', finWorkoutOpen=false;
 function finishWorkout(){
   const hasSets = S.active && S.active.exercises.some(ex=>ex.sets.some(s=>s.weight&&s.reps));
   if(!hasSets){ toast('Log a completed set first'); return; }
-  finMedia=null; finShare=false; finCapText=''; renderFinishReview(); openModal('finishModal');
+  finMedia=null; finShare=false; finCapText=''; finWorkoutOpen=false; renderFinishReview(); openModal('finishModal');
 }
 function toggleFinShare(){ const c=document.getElementById('finCap'); if(c) finCapText=c.value; finShare=!finShare; renderFinishReview(); }
+// Reveal the logged exercises/sets as a dropdown that overlays the finish sheet.
+// Toggle the class directly (no re-render) so nearby inputs keep their focus/value.
+function toggleFinWorkout(){ finWorkoutOpen=!finWorkoutOpen; const d=document.getElementById('finWorkoutDrop'); if(d) d.classList.toggle('open', finWorkoutOpen); }
 function pickFinMedia(input){ readImage(input,u=>{ finMedia=u; renderFinishReview(); }); }
 function renderFinishReview(){
   const a=S.active; if(!a) return;
@@ -106,6 +109,20 @@ function renderFinishReview(){
     </div>
     <div style="display:flex;justify-content:center;gap:10px;">${bodySVG('front',cf,108)}${bodySVG('back',cf,108)}</div>
     <div class="tiny muted" style="text-align:center;margin:4px 0 14px;">${fmt(vol)} ${S.units} volume · brighter = more</div>
+    <div class="findrop${finWorkoutOpen?' open':''}" id="finWorkoutDrop">
+      <button type="button" class="findrop-head" onclick="toggleFinWorkout()">
+        <div class="row" style="gap:11px;min-width:0;">
+          <div class="liftmark">${(exs[0]&&EXMAP[exs[0].id]||{}).icon||'🏋️'}</div>
+          <div style="min-width:0;"><div style="font-weight:700;">Your workout</div><div class="tiny muted">${exs.length} exercise${exs.length===1?'':'s'} · ${sets} set${sets===1?'':'s'}</div></div>
+        </div>
+        <span class="findrop-chev">⌄</span>
+      </button>
+      <div class="findrop-panel"><div class="findrop-inner">
+        ${exs.map(ex=>{ const meta=EXMAP[ex.id]||{}; const setsTxt=ex.sets.map(s=>`${s.weight}×${s.reps}`).join('  ');
+          return `<div class="lift"><div class="liftmark">${meta.icon||'🏋️'}</div><div class="grow" style="min-width:0;"><div style="font-weight:700;">${meta.name||'Exercise'}</div><div class="tiny muted">${ex.sets.length} set${ex.sets.length===1?'':'s'} · ${setsTxt}</div></div></div>`;
+        }).join('')}
+      </div></div>
+    </div>
     ${(function(){ const pr=countPRs({start:a.start,exercises:exs}); const est=shardsForSession({start:a.start,end:Date.now(),exercises:exs},pr);
       return `<div class="card flat" style="padding:11px 14px;margin:0 0 14px;display:flex;align-items:center;gap:9px;">${shardSVG(19)}<div style="font-weight:800;font-size:14px;">+${est.gain} Shards</div><div class="tiny muted" style="margin-left:auto;">${est.mins}m · ${est.sets} sets${pr?` · ${pr} PR <span style="color:var(--warn);">${icon('trophy',13)}</span>`:''}${est.mult>1?' · ×1.1 '+flameSVG(13):''}</div></div>`; })()}
     ${(!S.stk&&S.stkLost)?`<div class="card flat" style="padding:12px 14px;margin:0 0 14px;border:1px solid #4a2030;">
