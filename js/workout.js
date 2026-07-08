@@ -187,7 +187,9 @@ function startRest(){ rest=REST_DEFAULT; renderTimers(); }
 function addRest(n){ rest=Math.max(0,rest+n); renderTimers(); }
 function skipRest(){ rest=0; renderTimers(); }
 function renderTimers(){
-  if(S.active){ const el=document.getElementById('sessTimer'); if(el) el.textContent=fmtClock(Date.now()-S.active.start); }
+  if(S.active){ const t=fmtClock(Date.now()-S.active.start);
+    ['sessTimer','focusTimer','focusMiniTimer'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=t; });
+  }
   const rw=document.getElementById('restWrap');
   if(rw){
     if(rest>0){ rw.style.display='block';
@@ -199,6 +201,39 @@ function renderTimers(){
   }
 }
 setInterval(()=>{ if(rest>0){ rest--; if(rest===0) toast('Rest over 💪'); } renderTimers(); },1000);
+
+// ---------- Focus mode ----------
+// While a workout is active the #focusSheet takes over the screen. It can be minimized to a
+// mini bar (state 'min') so the rest of the app is usable, or hidden entirely when no session.
+let focusState='hidden';   // 'hidden' | 'expanded' | 'min'
+function applyFocus(){
+  const sheet=document.getElementById('focusSheet'), mini=document.getElementById('focusMini');
+  if(!sheet||!mini) return;
+  sheet.classList.toggle('show', focusState==='expanded');
+  mini.classList.toggle('show', focusState==='min');
+  sheet.setAttribute('aria-hidden', focusState==='expanded' ? 'false' : 'true');
+}
+function showFocus(){ if(focusState==='hidden') focusState='expanded'; applyFocus(); }   // don't yank a minimized user back open
+function hideFocus(){ focusState='hidden'; applyFocus(); }
+function expandFocus(){ if(!S.active) return; focusState='expanded'; applyFocus(); }
+function minimizeFocus(){ if(!S.active) return; focusState='min'; applyFocus(); }
+
+// Swipe the header down to minimize; snaps back if the drag is short.
+(function(){
+  const head=document.getElementById('focusHead'); if(!head) return;
+  const sheet=()=>document.getElementById('focusSheet');
+  let y0=null, dy=0;
+  head.addEventListener('touchstart', e=>{ y0=e.touches[0].clientY; dy=0; const s=sheet(); if(s) s.style.transition='none'; }, {passive:true});
+  head.addEventListener('touchmove', e=>{ if(y0==null) return; dy=Math.max(0, e.touches[0].clientY-y0); const s=sheet(); if(s) s.style.transform='translateY('+dy+'px)'; if(dy>0) e.preventDefault(); }, {passive:false});
+  head.addEventListener('touchend', ()=>{ const s=sheet(); if(s){ s.style.transition=''; s.style.transform=''; } if(dy>90){ minimizeFocus(); haptic&&haptic([0,18]); } y0=null; dy=0; });
+})();
+// Swipe the mini bar up (or tap it) to return to focus.
+(function(){
+  const mini=document.getElementById('focusMini'); if(!mini) return;
+  let y0=null;
+  mini.addEventListener('touchstart', e=>{ y0=e.touches[0].clientY; }, {passive:true});
+  mini.addEventListener('touchend', e=>{ if(y0!=null){ const dy=e.changedTouches[0].clientY-y0; if(dy<-24) expandFocus(); } y0=null; });
+})();
 
 // ---------- Exercise picker ----------
 let pickerTarget='active', pickSort='alpha', pickGroup='All';

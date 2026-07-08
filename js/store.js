@@ -221,18 +221,28 @@ function lastSessionBanner(){
 }
 function renderTrain(){
   renderTopbar();
-  const wrap=document.getElementById('activeWorkout'), none=document.getElementById('noWorkout');
-  if(!S.active){ wrap.innerHTML=lastSessionBanner(); none.style.display='block'; renderRoutines(); renderMemories(); return; }
-  none.style.display='none';
-  const liveSR=overallSRfrom([...S.sessions,S.active]); const r=rankFor(liveSR);
-  let html=lastSessionBanner()+`<div class="card" style="border-color:${r.color}55;">
-    <div class="row sb" style="margin-bottom:12px;">
-      <div><div style="font-weight:800;font-size:17px;">Active session</div>
-        <div class="tiny muted">⏱ <span id="sessTimer">0:00</span></div></div>
-      <div class="pill" style="border-color:${r.color}66;color:${r.color};">${rankEmblem(r,16)} ${liveSR.toFixed(0)} SR</div>
-    </div>`;
-  html+=`<div id="restWrap" style="display:none;"></div>`;
-  if(!S.active.exercises.length) html+=`<p class="empty" style="padding:18px;">No exercises yet — add your first lift.</p>`;
+  const wrap=document.getElementById('activeWorkout');
+  const banner=document.getElementById('lastSessSlot');
+  const none=document.getElementById('noWorkout');
+  // The Start-empty / routines / memories screen is always rendered underneath, so it's
+  // ready the moment the user minimizes the focus sheet.
+  none.style.display='block'; renderRoutines(); renderMemories();
+  if(!S.active){
+    if(banner) banner.innerHTML=lastSessionBanner();
+    if(wrap) wrap.innerHTML='';
+    hideFocus();
+    return;
+  }
+  if(banner) banner.innerHTML='';           // no "last session" banner while one is live
+  if(wrap) wrap.innerHTML=activeWorkoutBodyHTML();
+  showFocus();                              // reveal the focus sheet (expanded on first show)
+  renderTimers();
+}
+// The exercises/sets body that lives inside the focus sheet. The session timer, Finish,
+// Add-exercise and Rest controls are the sheet's own chrome (see index.html #focusSheet).
+function activeWorkoutBodyHTML(){
+  let html=`<div id="restWrap" style="display:none;"></div>`;
+  if(!S.active.exercises.length) html+=`<p class="empty" style="padding:24px 18px;">No exercises yet — tap ＋ Add exercise below.</p>`;
   S.active.exercises.forEach((ex,ei)=>{
     const meta=EXMAP[ex.id]; const prev=lastPerf(ex.id,S.active.start);
     html+=`<div class="exwrap">
@@ -256,12 +266,8 @@ function renderTrain(){
     });
     html+=`<button class="btn ghost sm" style="width:100%;margin-top:4px;" onclick="addSet(${ei})">＋ Add set</button></div>`;
   });
-  html+=`<button class="btn ghost" onclick="openExPicker('active')" style="margin-bottom:10px;">＋ Add exercise</button>
-    <div class="row" style="gap:10px;">
-      <button class="btn good grow" onclick="finishWorkout()">Finish</button>
-      <button class="btn danger sm" onclick="cancelWorkout()">Discard</button>
-    </div></div>`;
-  wrap.innerHTML=html; renderTimers();
+  html+=`<div style="text-align:center;margin:8px 0 4px;"><button class="btn danger sm" style="width:auto;padding:9px 18px;" onclick="cancelWorkout()">Discard workout</button></div>`;
+  return html;
 }
 function renderRoutines(){
   const el=document.getElementById('routines');

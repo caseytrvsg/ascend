@@ -1,5 +1,5 @@
 // ---------- TRAIN ----------
-function startWorkout(){ S.active={start:Date.now(), exercises:[]}; save(); renderTrain(); }
+function startWorkout(){ if(S.active){ expandFocus(); return; } S.active={start:Date.now(), exercises:[]}; save(); renderTrain(); }
 function renderTopbar(){
   const li=levelInfo(totalXP());
   document.getElementById('tbAv').textContent=(S.name||'A').slice(0,1).toUpperCase();
