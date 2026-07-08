@@ -35,7 +35,7 @@
 
   <!-- ============ TRAIN ============ -->
   <section id="screen-train" class="screen active">
-    <div id="activeWorkout"></div>
+    <div id="lastSessSlot"></div>
 
     <div id="noWorkout">
       <h2 style="margin-top:6px;">New workout</h2>
@@ -140,6 +140,33 @@
     <div class="card" id="invCard"></div>
     <div class="card" id="levelsBody"></div>
   </section>
+
+  <!-- Focus mode: while a workout is active this sheet takes over the screen so the user
+       stays on the lift. Swipe the header down (or tap ⌄) to drop it into the mini bar and
+       use the rest of the app; tap/swipe the mini bar up to return. -->
+  <div id="focusSheet" class="focus-sheet" aria-hidden="true">
+    <div class="focus-head" id="focusHead">
+      <div class="focus-grab"></div>
+      <div class="focus-headrow">
+        <button class="focus-min" onclick="minimizeFocus()" aria-label="Minimize workout">⌄</button>
+        <div class="focus-live"><span class="focus-dot"></span><span class="focus-timer" id="focusTimer">0:00</span></div>
+        <button class="btn good focus-finish" onclick="finishWorkout()">Finish</button>
+      </div>
+    </div>
+    <div class="focus-body" id="activeWorkout"></div>
+    <div class="focus-foot">
+      <button class="btn ghost" onclick="openExPicker('active')">＋ Add exercise</button>
+      <button class="btn focus-rest" onclick="startRest()">Rest</button>
+    </div>
+  </div>
+  <div id="focusMini" class="focus-mini" onclick="expandFocus()">
+    <div class="focus-mini-inner">
+      <span class="focus-dot"></span>
+      <div class="grow" style="min-width:0;"><div style="font-weight:800;font-size:14px;">Workout in progress</div><div class="tiny muted">Tap to return to focus</div></div>
+      <span class="focus-mini-timer" id="focusMiniTimer">0:00</span>
+      <span class="focus-mini-chev">⌃</span>
+    </div>
+  </div>
 
   <nav class="tabbar">
     <button class="tab active" data-screen="train" onclick="go('train')"><span class="ic"><svg width="23" height="23" viewBox="0 0 24 24" fill="currentColor" style="display:block;"><rect x="9" y="11" width="6" height="2" rx="1"/><rect x="6.4" y="8.4" width="2.3" height="7.2" rx="1"/><rect x="3.3" y="6.9" width="2.3" height="10.2" rx="1.1"/><rect x="15.3" y="8.4" width="2.3" height="7.2" rx="1"/><rect x="18.4" y="6.9" width="2.3" height="10.2" rx="1.1"/></svg></span>Workout</button>
