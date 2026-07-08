@@ -20,7 +20,7 @@ const STORE_SECTIONS=[
     {id:'phoenix',name:'Phoenix',        tag:'Consumable', tier:'prismatic',  price:1000,kind:'consumable', desc:'Rise from the ashes — revives your entire streak, no matter how long it was.'},
   ]},
   {key:'themes', title:'App Themes', layout:'shelf', items:[
-    {id:'th_mid',   name:'Midnight',       tag:'Theme', tier:'special',   price:0,   kind:'theme', accent:'#7c5cff', accent2:'#a78bff', desc:'The classic ASCEND violet.'},
+    {id:'th_mid',   name:'Midnight',       tag:'Theme', tier:'special',   price:0,   kind:'theme', accent:'#9d5cff', accent2:'#c3a3ff', desc:'The classic ASCEND violet.'},
     {id:'th_ember', name:'Ember',          tag:'Theme', tier:'cosmic',    price:200, kind:'theme', accent:'#ff6a3c', accent2:'#ffac7a', desc:'Molten orange energy.'},
     {id:'th_jade',  name:'Jade',           tag:'Theme', tier:'special',   price:200, kind:'theme', accent:'#1fc98c', accent2:'#74efc4', desc:'Cool emerald focus.'},
     {id:'th_arctic',name:'Arctic',         tag:'Theme', tier:'elemental', price:200, kind:'theme', accent:'#2f9fef', accent2:'#86d4ff', desc:'Icy blue clarity.'},
@@ -169,7 +169,7 @@ function renderInvCard(){
     ${owned.length?rows:`<div class="tiny muted">No items yet — grab boosts, freezes & revives in the Store.</div>`}`;
 }
 function storeInfo(id){ const it=findItem(id); if(it) toast(it.name+(it.desc?' — '+it.desc:'')); }
-function applyTheme(){ const it=S.theme?findItem(S.theme):null; document.documentElement.style.setProperty('--accent', (it&&it.accent)||'#7c5cff'); document.documentElement.style.setProperty('--accent2', (it&&it.accent2)||'#a78bff'); }
+function applyTheme(){ const it=S.theme?findItem(S.theme):null; document.documentElement.style.setProperty('--accent', (it&&it.accent)||'#9d5cff'); document.documentElement.style.setProperty('--accent2', (it&&it.accent2)||'#c3a3ff'); }
 function applyBorder(){ const it=S.border?findItem(S.border):null, ring=(it&&it.ring)||''; ['tbAv','pfAvatar'].forEach(idd=>{ const el=document.getElementById(idd); if(el) el.style.boxShadow=ring; }); }
 function applyBanner(){ const it=S.banner?findItem(S.banner):null, el=document.getElementById('pfIdCard'); if(el) el.style.background=(it&&it.bg)||''; }
 let storeTimer=null;

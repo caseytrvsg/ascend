@@ -1,7 +1,7 @@
   :root{
     --bg:#040406; --bg2:#0a0a0f; --card:#0d0d13; --card2:#14141c;
     --line:#1e1e2820; --line2:#22222c; --txt:#eef0f5; --mut:#7e7e8c; --mut2:#4e4e5a;
-    --accent:#7c5cff; --accent2:#a78bff; --good:#3ddc84; --bad:#ff5470; --warn:#ffb84d;
+    --accent:#9d5cff; --accent2:#c3a3ff; --good:#3ddc84; --bad:#ff5470; --warn:#ffb84d;
     --safe-bottom: env(safe-area-inset-bottom, 0px);
     --safe-top: env(safe-area-inset-top, 0px);
     --gtop: 50px;
