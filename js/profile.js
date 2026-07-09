@@ -344,7 +344,7 @@ function renderSettings(){
       <div class="setsec">Data & testing</div>
       ${setRow(icon('sparkle',18),'Preview ascension',{onclick:'closeSettings();previewAscension()'})}
       ${setRow('<span style="color:var(--warn);">'+icon('star',18)+'</span>','Pro mode (preview)',{right:proSeg})}
-      ${setRow(icon('trash',18),'Reset all data',{onclick:"if(confirm('Erase all data?')){resetAll();closeSettings();}",color:'var(--bad)'})}
+      ${setRow(icon('trash',18),'Reset all data',{onclick:'resetAll()',color:'var(--bad)'})}
       <div class="setsec">Resources</div>
       ${setRow(icon('help',18),'Frequently asked questions',{onclick:'comingSoon()'})}
       ${setRow(icon('mail',18),'Contact us',{onclick:'comingSoon()'})}
@@ -500,5 +500,5 @@ function setUnits(u){
   renderProfile(); renderTrain();
   toast('Switched to '+u+(f!==1?' · weights converted':''));
 }
-function resetAll(){ if(confirm('Erase all data?')){ S=fresh(); save(); go('train'); toast('Reset complete'); } }
+function resetAll(){ confirmDialog({ title:'Erase all data?', message:'This wipes your profile, workouts and settings on this device. This can’t be undone.', confirmText:'Erase everything', onConfirm:()=>{ S=fresh(); save(); closeSettings(); go('train'); toast('Reset complete'); } }); }
 

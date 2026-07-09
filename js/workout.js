@@ -62,7 +62,7 @@ function rmSet(ei,si){ S.active.exercises[ei].sets.splice(si,1); if(!S.active.ex
 function setVal(ei,si,k,v){ S.active.exercises[ei].sets[si][k]=v; save(); }
 function rmExercise(ei){ S.active.exercises.splice(ei,1); save(); renderTrain(); }
 function toggleDone(ei,si){ const s=S.active.exercises[ei].sets[si]; s.done=!s.done; if(s.done) startRest(); save(); renderTrain(); }
-function cancelWorkout(){ if(confirm('Discard this session?')){ S.active=null; rest=0; save(); renderTrain(); } }
+function cancelWorkout(){ confirmDialog({ title:'Discard this workout?', message:'The sets you’ve logged this session will be lost.', confirmText:'Discard', onConfirm:()=>{ S.active=null; rest=0; hideFocus(); save(); renderTrain(); toast('Workout discarded'); } }); }
 
 // Swipe a set row left to delete it. Delegated on #activeWorkout (survives re-renders); rows
 // carry data-ei/data-si. Horizontal-only — a vertical drag scrolls, a tap still edits the inputs.
@@ -303,7 +303,7 @@ function saveRoutine(){
   if(window.cloud && cloud.ready()) cloud.mark('routines');
   closeModal('routineModal'); renderTrain(); toast('Routine saved');
 }
-function delRoutine(ri){ if(confirm('Delete routine?')){ S.routines.splice(ri,1); save(); if(window.cloud && cloud.ready()) cloud.mark('routines'); renderTrain(); } }
+function delRoutine(ri){ const rt=S.routines[ri]; confirmDialog({ title:'Delete routine?', message:rt?('“'+escapeAttr(rt.name)+'” will be removed from your routines.'):'', confirmText:'Delete', onConfirm:()=>{ S.routines.splice(ri,1); save(); if(window.cloud && cloud.ready()) cloud.mark('routines'); renderTrain(); toast('Routine deleted'); } }); }
 function startRoutine(ri){
   const rt=S.routines[ri];
   S.active={start:Date.now(), exercises:rt.items.map(it=>({id:it.id, sets:Array.from({length:it.sets},()=>({weight:'',reps:'',done:false}))}))};

@@ -78,10 +78,11 @@ async function toggleLike(i){
   renderFeed(true);
   try{ await cloud.toggleLike(p.id, on); }catch(e){ /* will reconcile on next refresh */ }
 }
-async function deleteFeedPost(id){
-  if(!confirm('Delete this post?')) return;
-  try{ await cloud.deletePost(id); if(feedCache) feedCache=feedCache.filter(p=>p.id!==id); renderFeed(true); toast('Post deleted'); }
-  catch(e){ toast('Could not delete the post'); }
+function deleteFeedPost(id){
+  confirmDialog({ title:'Delete this post?', message:'It’ll be removed from the feed for everyone.', confirmText:'Delete', onConfirm:async()=>{
+    try{ await cloud.deletePost(id); if(feedCache) feedCache=feedCache.filter(p=>p.id!==id); renderFeed(true); toast('Post deleted'); }
+    catch(e){ toast('Could not delete the post'); }
+  }});
 }
 
 // ----- Compose a post (caption + photo + today's workout bodygraph) -----

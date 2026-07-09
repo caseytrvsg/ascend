@@ -8,7 +8,27 @@ let modalZ=130;
 function openModal(id){ const m=document.getElementById(id); m.style.zIndex=++modalZ; m.classList.add('open'); }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); if(id==='scanModal'&&window.Scanner) Scanner.stop(); if(!document.querySelector('.modal.open')) modalZ=130; }
 let toastT; function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2200); }
-['exModal','addExModal','routineModal','genModal','composeModal','memoryModal','allMemModal','editModal','finishModal','scanModal','friendsModal','proModal','accountModal'].forEach(id=>document.getElementById(id).addEventListener('click',e=>{ if(e.target.id===id) closeModal(id); }));
+['exModal','addExModal','routineModal','genModal','composeModal','memoryModal','allMemModal','editModal','finishModal','scanModal','friendsModal','proModal','accountModal','confirmModal'].forEach(id=>document.getElementById(id).addEventListener('click',e=>{ if(e.target.id===id) closeModal(id); }));
+
+// ---------- Themed confirm dialog (replaces the native confirm() popup) ----------
+// confirmDialog({title, message, confirmText, cancelText, danger, icon, onConfirm})
+let _confirmCb=null;
+function confirmDialog(opts){
+  opts=opts||{};
+  const danger=opts.danger!==false;                       // default: destructive (red) styling
+  const ic=opts.icon||(danger?'trash':'help');
+  _confirmCb=opts.onConfirm||null;
+  document.getElementById('confirmSheet').innerHTML=`<div class="grab"></div>
+    <div style="text-align:center;">
+      <div style="width:58px;height:58px;border-radius:50%;margin:2px auto 14px;display:flex;align-items:center;justify-content:center;background:${danger?'rgba(255,90,110,.13)':'rgba(157,92,255,.14)'};color:${danger?'var(--bad)':'var(--accent2)'};">${icon(ic,27)}</div>
+      <h2 style="margin:0 0 6px;">${opts.title||'Are you sure?'}</h2>
+      ${opts.message?`<p class="sub" style="margin:0 auto;max-width:300px;">${opts.message}</p>`:''}
+    </div>
+    <button class="btn ${danger?'danger':'good'}" style="margin-top:18px;" onclick="confirmResolve(true)">${opts.confirmText||'Confirm'}</button>
+    <button class="btn ghost" style="margin-top:8px;" onclick="confirmResolve(false)">${opts.cancelText||'Cancel'}</button>`;
+  openModal('confirmModal');
+}
+function confirmResolve(ok){ closeModal('confirmModal'); const cb=_confirmCb; _confirmCb=null; haptic(ok?[0,22]:12); if(ok&&cb) cb(); }
 
 // ---------- Haptics ----------
 // Web Vibration API (works on Android/Chrome). iOS Safari ignores it — the real
