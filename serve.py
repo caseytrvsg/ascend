@@ -7,11 +7,11 @@ exercise-requests.md so Casey can review and decide what to add officially.
 
 Run:  python3 serve.py          (port 5188, all interfaces — phone can connect over LAN)
 """
-import http.server, json, datetime, pathlib
+import http.server, json, datetime, pathlib, os
 
 ROOT = pathlib.Path(__file__).parent
 DOC = ROOT / "exercise-requests.md"
-PORT = 5188
+PORT = int(os.environ.get("PORT") or 5188)   # honor the port the preview harness assigns
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
