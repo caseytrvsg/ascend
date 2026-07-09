@@ -215,8 +215,8 @@ function applyFocus(){
 }
 function showFocus(){ if(focusState==='hidden') focusState='expanded'; applyFocus(); }   // don't yank a minimized user back open
 function hideFocus(){ focusState='hidden'; applyFocus(); }
-function expandFocus(){ if(!S.active) return; focusState='expanded'; applyFocus(); }
-function minimizeFocus(){ if(!S.active) return; focusState='min'; applyFocus(); }
+function expandFocus(){ if(!S.active || focusState==='expanded') return; focusState='expanded'; applyFocus(); haptic([0,14]); }
+function minimizeFocus(){ if(!S.active || focusState==='min') return; focusState='min'; applyFocus(); haptic([0,22]); }
 
 // Swipe the header down to minimize; snaps back if the drag is short.
 (function(){
@@ -225,7 +225,7 @@ function minimizeFocus(){ if(!S.active) return; focusState='min'; applyFocus(); 
   let y0=null, dy=0;
   head.addEventListener('touchstart', e=>{ y0=e.touches[0].clientY; dy=0; const s=sheet(); if(s) s.style.transition='none'; }, {passive:true});
   head.addEventListener('touchmove', e=>{ if(y0==null) return; dy=Math.max(0, e.touches[0].clientY-y0); const s=sheet(); if(s) s.style.transform='translateY('+dy+'px)'; if(dy>0) e.preventDefault(); }, {passive:false});
-  head.addEventListener('touchend', ()=>{ const s=sheet(); if(s){ s.style.transition=''; s.style.transform=''; } if(dy>90){ minimizeFocus(); haptic&&haptic([0,18]); } y0=null; dy=0; });
+  head.addEventListener('touchend', ()=>{ const s=sheet(); if(s){ s.style.transition=''; s.style.transform=''; } if(dy>90) minimizeFocus(); y0=null; dy=0; });
 })();
 // Swipe the mini bar up (or tap it) to return to focus.
 (function(){
