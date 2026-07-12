@@ -198,9 +198,22 @@ function renderStore(){
 // A readable muscle name per exercise (finer than the 6 score groups) for the "last session" summary.
 function exMuscle(id){
   const g=(EXMAP[id]||{}).group;
-  if(g==='Arms') return /curl|hammer|preacher/.test(id) ? 'Biceps' : 'Triceps';
-  if(g==='Back') return id==='shrug' ? 'Traps' : 'Back';
-  if(g==='Legs') return /rdl|legcurl/.test(id) ? 'Hamstrings' : id==='hip' ? 'Glutes' : id==='calf' ? 'Calves' : 'Quads';
+  if(g==='Arms'){
+    if(/wrist/.test(id)) return 'Forearms';
+    return /curl|hammer|preacher|spider|concentration/.test(id) ? 'Biceps' : 'Triceps';
+  }
+  if(g==='Back'){
+    if(/shrug/.test(id)) return 'Traps';
+    if(/goodmorning|backext/.test(id)) return 'Lower Back';
+    return 'Back';
+  }
+  if(g==='Legs'){
+    if(/rdl|legcurl|nordic|stiff/.test(id)) return 'Hamstrings';
+    if(/hip|kickback/.test(id)) return 'Glutes';
+    if(/calf/.test(id)) return 'Calves';
+    if(/adductor|abductor/.test(id)) return 'Adductors';
+    return 'Quads';
+  }
   return g||'';
 }
 function sessionMuscles(ses){

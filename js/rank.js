@@ -108,7 +108,15 @@ const ACT_SEC={
   ohp:{Arms:0.4,Core:0.2}, pressDb:{Arms:0.35}, arnold:{Arms:0.3},
   squat:{Core:0.4,Back:0.2}, front:{Core:0.45,Back:0.2}, hack:{Core:0.2}, rdl:{Back:0.4,Core:0.3},
   goblet:{Core:0.3}, bulgarian:{Core:0.25}, lunge:{Core:0.2}, hip:{Core:0.2}, legpress:{Core:0.1},
-  cgbench:{Chest:0.4,Shoulders:0.2}, abwheel:{Arms:0.1}
+  cgbench:{Chest:0.4,Shoulders:0.2}, abwheel:{Arms:0.1},
+  // Added compounds — secondary groups so they light more than their primary on the bodygraph.
+  smithBench:{Arms:0.4,Shoulders:0.3}, inclinePress:{Arms:0.3,Shoulders:0.35}, crossover:{Shoulders:0.2},
+  trapDead:{Legs:0.6,Core:0.4}, deficitDead:{Legs:0.6,Core:0.4}, goodmorning:{Legs:0.5,Core:0.4},
+  chestRow:{Arms:0.4}, machineRow:{Arms:0.4}, meadows:{Arms:0.4}, invertedRow:{Arms:0.4,Core:0.2},
+  widePulldown:{Arms:0.35}, neutralPulldown:{Arms:0.35}, pullover:{Chest:0.3},
+  pushpress:{Arms:0.4,Legs:0.3,Core:0.3}, seatedOhp:{Arms:0.4,Core:0.2}, machineShoulder:{Arms:0.35}, landmine:{Chest:0.3,Arms:0.3,Core:0.2},
+  smithSquat:{Core:0.4,Back:0.2}, boxsquat:{Core:0.4,Back:0.2}, beltsquat:{Core:0.3}, stiffleg:{Back:0.4,Core:0.3},
+  stepup:{Core:0.2}, pistol:{Core:0.3}, benchdip:{Chest:0.3,Shoulders:0.2}, woodchopper:{Arms:0.1}
 };
 function activationForSession(ses){
   const act={}; GROUPS.forEach(g=>act[g]=0);
