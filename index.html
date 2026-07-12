@@ -46,7 +46,10 @@
 
       <div class="row sb" style="margin:22px 0 12px;">
         <h2 style="margin:0;">Routines</h2>
-        <button class="btn ghost sm" onclick="newRoutine()">＋ New</button>
+        <div class="row" style="gap:8px;">
+          <button class="btn ghost sm" onclick="openShareRoutine()" title="Send a routine to a friend"><span data-icon="chat" data-sz="14"></span> Share</button>
+          <button class="btn ghost sm" onclick="newRoutine()">＋ New</button>
+        </div>
       </div>
       <div id="routines"></div>
 

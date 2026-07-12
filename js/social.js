@@ -369,10 +369,18 @@ function renderFriends(){
   if(hadFocus){ const s=document.getElementById('frSearch'); if(s){ s.focus(); s.setSelectionRange(s.value.length,s.value.length); } }
 }
 // ---------- Friend chat (cloud DMs + routine sharing) ----------
-let chatWith=null, chatName='', chatLog=[], shareOpen=false;
+let chatWith=null, chatName='', chatLog=[], shareOpen=false, chatShareIntent=false;
+// Shortcut from the Routines header: jump to the DM flow to send a routine to a friend.
+function openShareRoutine(){
+  if(!(window.cloud && cloud.ready())){ toast('Sign in to share routines with friends'); return; }
+  if(!(S.routines||[]).length){ toast('Build a routine first, then share it'); return; }
+  chatShareIntent=true;                        // next chat opens with the routine-share panel up
+  openFriends();
+  if(FR.friends.length) toast('Tap a friend to send them a routine');
+}
 async function openChat(id,name){
   if(!(window.cloud&&cloud.ready())){ toast('Sign in to message friends'); return; }
-  chatWith=id; chatName=name||'Friend'; shareOpen=false; chatLog=[];
+  chatWith=id; chatName=name||'Friend'; shareOpen=!!chatShareIntent; chatShareIntent=false; chatLog=[];
   closeModal('friendsModal'); document.getElementById('chatScreen').classList.add('show'); renderChat();
   try{ chatLog=await cloud.getMessages(id); renderChat(); }catch(e){}
 }
