@@ -20,8 +20,18 @@ function openPro(){
 function upgradeProDemo(){ S.pro=true; save(); closeModal('proModal'); haptic([0,40,40,80]); toast('Pro unlocked ⭐'); renderProfile(); }
 function setPro(b){ S.pro=b; save(); if(document.getElementById('settingsScreen').classList.contains('show')) renderSettings(); renderProfile(); toast(b?'Pro enabled':'Pro disabled'); }
 // ----- Profile photo & banner (user-uploaded, stored on this device) -----
-function pickAvatar(input){ readImage(input, u=>{ S.avatar=u; save(); renderProfile(); haptic([0,20]); toast('Profile photo updated'); }, 320); input.value=''; }
-function pickBanner(input){ readImage(input, u=>{ S.bannerImg=u; save(); renderProfile(); haptic([0,20]); toast('Banner updated'); }, 1000); input.value=''; }
+function pickAvatar(input){ readImage(input, u=>applyUserImage('avatar', u), 320); input.value=''; }
+function pickBanner(input){ readImage(input, u=>applyUserImage('banner', u), 1000); input.value=''; }
+async function applyUserImage(kind, dataUrl){
+  const ok = await moderateImage(dataUrl, kind);
+  if(!ok){ haptic([0,40]); toast('That image can’t be used — please choose another'); return; }
+  if(kind==='avatar') S.avatar=dataUrl; else S.bannerImg=dataUrl;
+  save(); renderProfile(); haptic([0,20]); toast(kind==='avatar'?'Profile photo updated':'Banner updated');
+}
+// Image moderation hook — passthrough for now. To block sexual content in profile photos/banners,
+// implement the check here (a client-side NSFW model, or a Supabase vision edge function) and
+// return false to reject. Every avatar/banner upload already flows through this one place.
+async function moderateImage(dataUrl, kind){ return true; }
 function removeAvatar(){ S.avatar=null; save(); renderProfile(); toast('Profile photo removed'); }
 function removeBanner(){ S.bannerImg=null; save(); renderProfile(); toast('Banner removed'); }
 function renderProfile(){
@@ -364,6 +374,7 @@ function renderAccountSheet(){
   document.getElementById('accountSheet').innerHTML=`<div class="grab"></div>
     <h2 style="margin:0 0 4px;display:flex;align-items:center;gap:8px;">${signin?'Sign in':'Create your account'} <span style="color:var(--accent2);">${icon('cloud',20)}</span></h2>
     <p class="sub" style="margin-bottom:14px;">${signin?'Your lifts, rank and streaks load onto this device.':'Your data follows you to any device — and you join the leaderboard when friends arrive.'}</p>
+    ${appleBtnHTML()}
     ${signin?'':`<label class="f">Lifter name (public · 3–20 letters, numbers, _)</label>
     <input id="acUser" placeholder="e.g. ${escapeAttr((S.name||'lifter').replace(/[^A-Za-z0-9_]/g,'')||'lifter')}" style="margin-bottom:10px;">`}
     <label class="f">Email</label>

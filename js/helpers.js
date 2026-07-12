@@ -30,6 +30,31 @@ function confirmDialog(opts){
 }
 function confirmResolve(ok){ closeModal('confirmModal'); const cb=_confirmCb; _confirmCb=null; haptic(ok?[0,22]:12); if(ok&&cb) cb(); }
 
+// ---------- Profanity filter ----------
+// Client-side moderation for user-typed public text (custom exercises, etc.). Blocks common
+// profanity + slurs, with light leetspeak/obfuscation handling. Word-boundary matching keeps
+// innocent words safe (e.g. "assisted", "class"); short words like "ass" only match whole-word.
+const PROFANITY=['fuck','shit','bitch','cunt','dick','cock','pussy','asshole','ass','bastard',
+  'piss','slut','whore','wank','twat','bollock','prick','dildo','boner','jizz','cum','blowjob',
+  'handjob','porn','porno','sex','nude','naked','boob','tit','vagina','penis','clit','anus','anal',
+  'nigger','nigga','faggot','fag','retard','spastic','coon','chink','spic','kike','tranny','dyke'];
+function normalizeForFilter(s){
+  return (s||'').toLowerCase()
+    .replace(/[@4]/g,'a').replace(/3/g,'e').replace(/[1!|]/g,'i').replace(/0/g,'o')
+    .replace(/[$5]/g,'s').replace(/7/g,'t').replace(/8/g,'b')
+    .replace(/[^a-z\s]/g,' ')       // strip remaining punctuation/emoji to spaces
+    .replace(/(.)\1{2,}/g,'$1$1')   // collapse fuuuu -> fuu
+    .replace(/\s+/g,' ').trim();
+}
+function containsProfanity(s){
+  const norm=normalizeForFilter(s); if(!norm) return false;
+  const squished=norm.replace(/\s+/g,'');    // catches spaced-out evasion like "f u c k"
+  return PROFANITY.some(w=>{
+    if(new RegExp('\\b'+w+'\\b').test(norm)) return true;
+    return w.length>=4 && squished.includes(w);   // squish-match only longer words to avoid false hits
+  });
+}
+
 // ---------- Haptics ----------
 // Web Vibration API (works on Android/Chrome). iOS Safari ignores it — the real
 // React Native build will use the iOS Taptic Engine (Expo Haptics) for true haptics.

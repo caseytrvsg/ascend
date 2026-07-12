@@ -31,6 +31,7 @@ function submitCustomEx(){
   const name=(document.getElementById('cxName').value||'').trim();
   const group=document.getElementById('cxGroup').value, equip=(document.getElementById('cxEquip').value||'').trim();
   if(!name){ toast('Give the exercise a name'); return; }
+  if(containsProfanity(name) || containsProfanity(equip)){ toast('Please keep it clean — pick a different name'); return; }
   if(EXERCISES.some(e=>e.name.toLowerCase()===name.toLowerCase())){ toast('That exercise already exists'); return; }
   const c={id:'cx'+Date.now(), name, group, std:groupDefaultStd(group), equip};
   S.customEx=S.customEx||[]; S.customEx.push(c); registerCustomEx(c); save();
