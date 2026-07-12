@@ -5,8 +5,14 @@ if(!S.onboarded && !S.sessions.length) startOnboarding();
 renderTrain();
 // Cloud: restore session, pull account data, then refresh whatever's on screen.
 window.S = S;
+// If we just bounced back from a failed OAuth redirect (e.g. Apple not configured yet),
+// surface the error cleanly and strip it from the URL instead of leaving a raw hash.
+(function(){ const p=new URLSearchParams((location.hash||'').replace(/^#/,'')); const err=p.get('error_description')||p.get('error');
+  if(err){ setTimeout(()=>toast(decodeURIComponent(err).replace(/\+/g,' ')),500); history.replaceState(null,'',location.pathname); } })();
 if(window.cloud && cloud.configured) cloud.init().then(u=>{
   if(!u) return;
+  // Returning from a successful OAuth sign-in on a fresh device: treat as onboarded + dismiss the intro.
+  if(!S.onboarded){ S.onboarded=true; const ob=document.getElementById('onboard'); if(ob) ob.classList.remove('show'); }
   cloud.onSocial(ev=>{
     if(ev.type==='nudge'){ haptic([0,20,30,20]); toast('👋 A friend nudged you — check Friends'); refreshSocial(); }
     else if(ev.type==='friend'){ if(ev.row && ev.row.status==='pending' && ev.row.requested_by!==cloud.user().id){ haptic([0,20]); toast('New friend request 👥'); } refreshSocial(); }

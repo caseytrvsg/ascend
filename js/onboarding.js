@@ -84,6 +84,7 @@ function renderOnb(){
       h=`<div style="margin-bottom:8px;color:var(--accent2);">${icon('cloud',40)}</div>
         <div class="onbq">Welcome back</div>
         <div class="onbsub">Sign in and your lifts, rank and streaks load right onto this device.</div>
+        ${appleBtnHTML()}
         <label class="f">Email</label>
         <input id="onbEmail" type="email" placeholder="you@email.com" value="${escapeAttr(onb.email||'')}">
         <label class="f" style="margin-top:10px;">Password</label>
@@ -93,6 +94,7 @@ function renderOnb(){
       h=`<div style="margin-bottom:8px;color:var(--accent2);">${icon('cloud',40)}</div>
         <div class="onbq">Save your progress</div>
         <div class="onbsub">Create your account — your data follows you to any device, and you're on the leaderboard when friends join.</div>
+        ${appleBtnHTML()}
         <label class="f">Lifter name (public · 3–20 letters, numbers, _)</label>
         <input id="onbUser" placeholder="e.g. ${escapeAttr(suggested)}" value="${escapeAttr(onb.user||'')}">
         <label class="f" style="margin-top:10px;">Email</label>
@@ -116,6 +118,23 @@ function applyOnbToS(){
 function finishOnb(msg){
   document.getElementById('onboard').classList.remove('show');
   haptic([0,40,40,80]); applyTheme(); renderTrain(); go('train'); toast(msg);
+}
+// ----- Sign in with Apple (OAuth) -----
+// Reusable button markup + an "or" divider, shared by onboarding and the account sheet.
+function appleBtnHTML(){
+  return `<button type="button" class="btn-apple" onclick="appleSignIn()">
+    <svg width="16" height="18" viewBox="0 0 16 18" fill="currentColor" aria-hidden="true"><path d="M13.29 9.6c-.02-2.03 1.66-3 1.73-3.05-.94-1.38-2.41-1.57-2.93-1.59-1.25-.13-2.44.73-3.07.73-.63 0-1.61-.71-2.65-.69-1.36.02-2.62.79-3.32 2.01-1.42 2.46-.36 6.1 1.02 8.1.67.98 1.47 2.08 2.52 2.04 1.01-.04 1.39-.65 2.61-.65 1.22 0 1.56.65 2.63.63 1.09-.02 1.78-1 2.44-1.98.77-1.13 1.09-2.23 1.11-2.29-.02-.01-2.13-.82-2.15-3.26zM11.27 3.66c.56-.68.94-1.62.83-2.56-.81.03-1.79.54-2.37 1.21-.52.6-.97 1.56-.85 2.48.9.07 1.83-.46 2.39-1.13z"/></svg>
+    <span>Sign in with Apple</span></button>
+    <div class="orline">or</div>`;
+}
+async function appleSignIn(){
+  if(!(window.cloud && cloud.configured)){ toast('Sign-in is unavailable right now'); return; }
+  try{ await cloud.signInWithOAuth('apple'); }   // redirects to Apple, then back to the app
+  catch(e){ const m=(e&&e.message)||'';
+    toast(/not enabled|Unsupported provider|validation_failed/i.test(m)
+      ? 'Apple sign-in isn’t switched on yet — finish the Apple + Supabase setup'
+      : /Failed to fetch/i.test(m) ? 'No connection — check your internet and try again'
+      : 'Couldn’t start Apple sign-in — try again'); }
 }
 // Friendly wording for auth errors a non-technical user will actually hit.
 function authErrMsg(e){ const m=(e&&e.message)||'';

@@ -38,6 +38,18 @@ window.cloud = (() => {
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
     if (error) throw error; user = data.user; return user;
   };
+  // OAuth (e.g. Apple). Redirects the browser to the provider and back to the app;
+  // on return, init()'s getSession() picks up the session. Needs the provider enabled
+  // in Supabase + the redirect URL on the allow-list, else it bounces back with an error.
+  const signInWithOAuth = async (provider) => {
+    if (!sb) throw new Error('cloud-unconfigured');
+    const { data, error } = await sb.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: location.origin + location.pathname },
+    });
+    if (error) throw error;
+    return data;
+  };
   const signOut = async () => { await sb.auth.signOut(); user = null; };
 
   // ---- push (drain queue)
@@ -311,7 +323,7 @@ window.cloud = (() => {
   const pending = () => { const x = q();
     return (x.profile?1:0)+(x.routines?1:0)+(x.customEx?1:0)+((x.sessions||[]).length)+((x.meals||[]).length); };
 
-  return { init, ready, signUp, signIn, signOut, syncNow, pullAll, queueAllLocal, mark, pending,
+  return { init, ready, signUp, signIn, signInWithOAuth, signOut, syncNow, pullAll, queueAllLocal, mark, pending,
     searchUsers, sendFriendRequest, respondFriend, listFriendships, sendNudge, listNudges, markNudgeSeen,
     getLeaderboard, startRealtime, onSocial: f => { socialCb = f; },
     createPost, getFeed, toggleLike, deletePost,

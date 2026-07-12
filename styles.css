@@ -40,6 +40,11 @@
   .btn.sm{padding:10px 14px; font-size:14px; width:auto;}
   .btn.danger{background:#2a1620; color:var(--bad); border:1px solid #4a2030;}
   .btn.good{background:var(--good); color:#04120a;}
+  .btn-apple{width:100%; display:flex; align-items:center; justify-content:center; gap:9px; background:#fff; color:#000; border:1px solid #fff; border-radius:14px; padding:13px 16px; font-size:15px; font-weight:600; transition:transform .08s, filter .15s;}
+  .btn-apple:active{transform:scale(.97); filter:brightness(.92);}
+  .btn-apple svg{margin-top:-2px;}
+  .orline{display:flex; align-items:center; gap:12px; margin:14px 0; color:var(--mut2); font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.5px;}
+  .orline::before,.orline::after{content:''; flex:1; height:1px; background:var(--line2);}
 
   input,select,textarea{
     font-family:inherit; font-size:16px; color:var(--txt); background:var(--bg2);
